@@ -43,6 +43,15 @@ gulp.task("python-build", function(cb){
 	});
 });
 
+gulp.task("python-build-all", function(cb){
+	console.info('Starting python build all');
+	var python = spawn('python', ['build.py'], {stdio: 'inherit'});
+	python.on('close', function (code) {
+		console.log('python exited with code ' + code);
+		cb(code);
+	});
+});
+
 function pxtPublishTask() {
 	if (fs.existsSync('../pxt')) {
 		gulp.src('./blocks_compressed.js').pipe(gulp.dest('../pxt/webapp/public/blockly/'));
@@ -60,7 +69,7 @@ gulp.task('build', ['compile', 'python-build'], function (cb) {
 
 gulp.task('publish', ['compile', 'python-build'], pxtPublishTask);
 
-gulp.task('release', ['compile', 'python-build'], function (done) {
+gulp.task('release', ['compile', 'python-build-all'], function (done) {
 	spawn('npm', ['publish'], { stdio: 'inherit' }).on('close', done);
 });
 
