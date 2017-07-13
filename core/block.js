@@ -159,7 +159,7 @@ Blockly.Block = function(workspace, prototypeName, opt_id) {
   /** @type {boolean|undefined} */
   this.inputsInlineDefault = this.inputsInline;
   if (Blockly.Events.isEnabled()) {
-    Blockly.Events.fire(new Blockly.Events.Create(this));
+    Blockly.Events.fire(new Blockly.Events.BlockCreate(this));
   }
   // Bind an onchange function, if it exists.
   if (goog.isFunction(this.onchange)) {
@@ -212,7 +212,7 @@ Blockly.Block.prototype.dispose = function(healStack) {
   }
   this.unplug(healStack);
   if (Blockly.Events.isEnabled()) {
-    Blockly.Events.fire(new Blockly.Events.Delete(this));
+    Blockly.Events.fire(new Blockly.Events.BlockDelete(this));
   }
   Blockly.Events.disable();
 
@@ -314,7 +314,7 @@ Blockly.Block.prototype.getConnections_ = function() {
 /**
  * Walks down a stack of blocks and finds the last next connection on the stack.
  * @return {Blockly.Connection} The last next connection on the stack, or null.
- * @private
+ * @package
  */
 Blockly.Block.prototype.lastConnectionInStack_ = function() {
   var nextConnection = this.nextConnection;
@@ -796,7 +796,7 @@ Blockly.Block.prototype.setOutput = function(newBoolean, opt_check) {
  */
 Blockly.Block.prototype.setInputsInline = function(newBoolean) {
   if (this.inputsInline != newBoolean) {
-    Blockly.Events.fire(new Blockly.Events.Change(
+    Blockly.Events.fire(new Blockly.Events.BlockChange(
         this, 'inline', null, this.inputsInline, newBoolean));
     this.inputsInline = newBoolean;
   }
@@ -835,7 +835,7 @@ Blockly.Block.prototype.getInputsInline = function() {
  */
 Blockly.Block.prototype.setDisabled = function(disabled) {
   if (this.disabled != disabled) {
-    Blockly.Events.fire(new Blockly.Events.Change(
+    Blockly.Events.fire(new Blockly.Events.BlockChange(
         this, 'disabled', null, this.disabled, disabled));
     this.disabled = disabled;
   }
@@ -872,7 +872,7 @@ Blockly.Block.prototype.isCollapsed = function() {
  */
 Blockly.Block.prototype.setCollapsed = function(collapsed) {
   if (this.collapsed_ != collapsed) {
-    Blockly.Events.fire(new Blockly.Events.Change(
+    Blockly.Events.fire(new Blockly.Events.BlockChange(
         this, 'collapsed', null, this.collapsed_, collapsed));
     this.collapsed_ = collapsed;
   }
@@ -1070,10 +1070,14 @@ Blockly.Block.prototype.interpolate_ = function(message, args, lastDummyAlign) {
   for (var i = 0; i < tokens.length; i++) {
     var token = tokens[i];
     if (typeof token == 'number') {
-      goog.asserts.assert(token > 0 && token <= args.length,
-          'Message index %%s out of range.', token);
-      goog.asserts.assert(!indexDup[token],
-          'Message index %%s duplicated.', token);
+      if (token <= 0 || token > args.length) {
+        throw new Error('Block \"' + this.type + '\": ' +
+            'Message index %' + token + ' out of range.');
+      }
+      if (indexDup[token]) {
+        throw new Error('Block \"' + this.type + '\": ' +
+            'Message index %' + token + ' duplicated.');
+      }
       indexDup[token] = true;
       indexCount++;
       elements.push(args[token - 1]);
@@ -1084,8 +1088,10 @@ Blockly.Block.prototype.interpolate_ = function(message, args, lastDummyAlign) {
       }
     }
   }
-  goog.asserts.assert(indexCount == args.length,
-      'block "%s": Message does not reference all %s arg(s).', this.type, args.length);
+  if(indexCount != args.length) {
+    throw new Error('Block \"' + this.type + '\": ' +
+        'Message does not reference all ' + args.length + ' arg(s).');
+  }
   // Add last dummy input if needed.
   if (elements.length && (typeof elements[elements.length - 1] == 'string' ||
       goog.string.startsWith(elements[elements.length - 1]['type'],
@@ -1396,7 +1402,7 @@ Blockly.Block.prototype.getCommentText = function() {
  */
 Blockly.Block.prototype.setCommentText = function(text) {
   if (this.comment != text) {
-    Blockly.Events.fire(new Blockly.Events.Change(
+    Blockly.Events.fire(new Blockly.Events.BlockChange(
         this, 'comment', null, this.comment, text || ''));
     this.comment = text;
   }
@@ -1434,7 +1440,7 @@ Blockly.Block.prototype.getRelativeToSurfaceXY = function() {
  */
 Blockly.Block.prototype.moveBy = function(dx, dy) {
   goog.asserts.assert(!this.parentBlock_, 'Block has parent.');
-  var event = new Blockly.Events.Move(this);
+  var event = new Blockly.Events.BlockMove(this);
   this.xy_.translate(dx, dy);
   event.recordNew();
   Blockly.Events.fire(event);
