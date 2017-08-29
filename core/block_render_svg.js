@@ -125,7 +125,7 @@ Blockly.BlockSvg.NOTCH_HEIGHT = 2 * Blockly.BlockSvg.GRID_UNIT;
  * Rounded corner radius.
  * @const
  */
-Blockly.BlockSvg.CORNER_RADIUS = 1 * Blockly.BlockSvg.GRID_UNIT;
+Blockly.BlockSvg.CORNER_RADIUS = 2 * Blockly.BlockSvg.GRID_UNIT;
 
 /**
  * Minimum width of statement input edge on the left, in px.
@@ -165,7 +165,7 @@ Blockly.BlockSvg.NOTCH_PATH_LEFT = (
   'c 2,0 3,1 4,2 ' +
   'l 4,4 ' +
   'c 1,1 2,2 4,2 ' +
-  'h 12 ' +
+  'h 16 ' +
   'c 2,0 3,-1 4,-2 ' +
   'l 4,-4 ' +
   'c 1,-1 2,-2 4,-2'
@@ -179,7 +179,7 @@ Blockly.BlockSvg.NOTCH_PATH_RIGHT = (
   'c -2,0 -3,1 -4,2 '+
   'l -4,4 ' +
   'c -1,1 -2,2 -4,2 ' +
-  'h -12 ' +
+  'h -16 ' +
   'c -2,0 -3,-1 -4,-2 ' +
   'l -4,-4 ' +
   'c -1,-1 -2,-2 -4,-2'
@@ -189,7 +189,7 @@ Blockly.BlockSvg.NOTCH_PATH_RIGHT = (
  * Amount of padding before the notch.
  * @const
  */
-Blockly.BlockSvg.NOTCH_START_PADDING = 3 * Blockly.BlockSvg.GRID_UNIT;
+Blockly.BlockSvg.NOTCH_START_PADDING = 4 * Blockly.BlockSvg.GRID_UNIT;
 
 /**
  * SVG start point for drawing the top-left corner.
@@ -966,8 +966,8 @@ Blockly.BlockSvg.prototype.computeOutputPadding_ = function(inputRows) {
     if (shape == Blockly.OUTPUT_SHAPE_ROUND && inputRows.length > 1) {
       // Multi-line reporter blocks need extra padding
       var rowCount = inputRows.length;
-      row.paddingStart += (10 + rowCount * 7);
-      row.paddingEnd += (10 + rowCount * 7);
+      row.paddingStart += (8 + rowCount * 8);
+      row.paddingEnd += (8 + rowCount * 8);
     }
   }
 };
