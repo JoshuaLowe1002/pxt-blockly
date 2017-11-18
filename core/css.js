@@ -136,6 +136,7 @@ Blockly.Css.CONTENT = [
     'overflow: hidden;',  /* IE overflows by default. */
     'position: absolute;',
     'display: block;',
+    'touch-action: none',
   '}',
 
   /* Necessary to position the drag surface */
@@ -184,6 +185,7 @@ Blockly.Css.CONTENT = [
     'position: absolute;',
     'top: 0;',
     'left: 0;',
+    'touch-action: none',
   '}',
   /* Added as a separate rule with multiple classes to make it more specific
      than a bootstrap rule that selects svg:root. See issue #1275 for context.
@@ -373,6 +375,7 @@ Blockly.Css.CONTENT = [
     'cursor: url("<<<PATH>>>/handopen.cur"), auto;',
     'cursor: grab;',
     'cursor: -webkit-grab;',
+    'touch-action: none',
   '}',
 
    '.blocklyDragging {',
@@ -397,6 +400,7 @@ Blockly.Css.CONTENT = [
     'cursor: url("<<<PATH>>>/handclosed.cur"), auto;',
     'cursor: grabbing;',
     'cursor: -webkit-grabbing;',
+    'touch-action: none',
   '}',
 
   '.blocklyDragging.blocklyDraggingDelete {',
@@ -575,6 +579,7 @@ Blockly.Css.CONTENT = [
   '.blocklyMainBackground {',
     'stroke-width: 1;',
     'stroke: #c6c6c6;',  /* Equates to #ddd due to border being off-pixel. */
+    'touch-action: none',
   '}',
 
   '.blocklyMutatorBackground {',
@@ -603,6 +608,7 @@ Blockly.Css.CONTENT = [
   '.blocklyScrollbarHorizontal, .blocklyScrollbarVertical {',
     'position: absolute;',
     'outline: none;',
+    'touch-action: none',
   '}',
 
   '.blocklyScrollbarBackground {',
