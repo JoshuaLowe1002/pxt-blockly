@@ -47,6 +47,19 @@ Blockly.FieldSlider = function (opt_value, opt_min, opt_max, opt_precision,
 goog.inherits(Blockly.FieldSlider, Blockly.FieldNumber);
 
 /**
+ * Construct a FieldSlider from a JSON arg object.
+ * @param {!Object} options A JSON object with options (value, min, max, and
+ *                          precision).
+ * @returns {!Blockly.FieldSlider} The new field instance.
+ * @package
+ * @nocollapse
+ */
+Blockly.FieldSlider.fromJson = function(options) {
+  return new Blockly.FieldSlider(options['value'],
+      options['min'], options['max'], options['precision']);
+};
+
+/**
  * Show the inline free-text editor on top of the text.
  * @private
  */
@@ -131,7 +144,7 @@ Blockly.FieldSlider.prototype.dispose = function () {
  * @param {string} text The user's text.
  * @return {?string} A string representing a valid number, or null if invalid.
  */
-Blockly.FieldNumber.prototype.classValidator = function(text) {
+Blockly.FieldSlider.prototype.classValidator = function(text) {
   if (text === null) {
     return null;
   }
@@ -152,3 +165,5 @@ Blockly.FieldNumber.prototype.classValidator = function(text) {
   }
   return String(n);
 };
+
+Blockly.Field.register('field_slider', Blockly.FieldSlider);

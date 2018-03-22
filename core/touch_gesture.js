@@ -37,8 +37,7 @@ goog.require('goog.math.Coordinate');
  * @constructor
  */
 Blockly.TouchGesture = function(e, creatorWorkspace) {
-  Blockly.TouchGesture.superClass_.constructor.call(this, e,
-    creatorWorkspace);
+  Blockly.TouchGesture.superClass_.constructor.call(this, e, creatorWorkspace);
 
   /**
    * Boolean for whether or not this gesture is a multi-touch gesture.
@@ -101,7 +100,7 @@ Blockly.TouchGesture.ZOOM_OUT_MULTIPLIER = 6;
  */
 Blockly.TouchGesture.prototype.doStart = function(e) {
   Blockly.TouchGesture.superClass_.doStart.call(this, e);
-  if (Blockly.Touch.isTouchEvent(e)) {
+  if (!this.isEnding_ && Blockly.Touch.isTouchEvent(e)) {
     this.handleTouchStart(e);
   }
 };
@@ -116,13 +115,17 @@ Blockly.TouchGesture.prototype.doStart = function(e) {
  */
 Blockly.TouchGesture.prototype.bindMouseEvents = function(e) {
   this.onStartWrapper_ = Blockly.bindEventWithChecks_(
-    document, 'mousedown', null, this.handleStart.bind(this), /*opt_noCaptureIdentifier*/ true);
+      document, 'mousedown', null, this.handleStart.bind(this),
+      /*opt_noCaptureIdentifier*/ true);
   this.onMoveWrapper_ = Blockly.bindEventWithChecks_(
-    document, 'mousemove', null, this.handleMove.bind(this), /*opt_noCaptureIdentifier*/ true);
+      document, 'mousemove', null, this.handleMove.bind(this),
+      /*opt_noCaptureIdentifier*/ true);
   this.onUpWrapper_ = Blockly.bindEventWithChecks_(
-    document, 'mouseup', null, this.handleUp.bind(this), /*opt_noCaptureIdentifier*/ true);
+      document, 'mouseup', null, this.handleUp.bind(this),
+      /*opt_noCaptureIdentifier*/ true);
 
   e.preventDefault();
+  e.stopPropagation();
 };
 
 /**
@@ -131,7 +134,7 @@ Blockly.TouchGesture.prototype.bindMouseEvents = function(e) {
  * @package
  */
 Blockly.TouchGesture.prototype.handleStart = function(e) {
-  if (!this.isDragging) {
+  if (this.isDragging()) {
     // A drag has already started, so this can no longer be a pinch-zoom.
     return;
   }
@@ -226,8 +229,8 @@ Blockly.TouchGesture.prototype.handleTouchStart = function(e) {
     var point1 = this.cachedPoints_[pointers[1]];
     this.startDistance_ = goog.math.Coordinate.distance(point0, point1);
     this.isMultiTouch_ = true;
+    e.preventDefault();
   }
-  e.preventDefault();
 };
 
 /**
@@ -249,19 +252,19 @@ Blockly.TouchGesture.prototype.handleTouchMove = function(e) {
     var moveDistance = goog.math.Coordinate.distance(point0, point1);
     var startDistance = this.startDistance_;
     var scale = this.touchScale_ = moveDistance / startDistance;
-    
     if (this.previousScale_ > 0 && this.previousScale_ < Infinity) {
       var gestureScale = scale - this.previousScale_;
       var delta = gestureScale > 0 ?
         gestureScale * Blockly.TouchGesture.ZOOM_IN_MULTIPLIER :
         gestureScale * Blockly.TouchGesture.ZOOM_OUT_MULTIPLIER;
       var workspace = this.startWorkspace_;
-      var position = Blockly.utils.mouseToSvg(e, workspace.getParentSvg(), workspace.getInverseScreenCTM());
+      var position = Blockly.utils.mouseToSvg(
+          e, workspace.getParentSvg(), workspace.getInverseScreenCTM());
       workspace.zoom(position.x, position.y, delta);
     }
     this.previousScale_ = scale;
+    e.preventDefault();
   }
-  e.preventDefault();
 };
 
 /**
@@ -291,7 +294,7 @@ Blockly.TouchGesture.prototype.getTouchPoint = function(e) {
     return null;
   }
   return new goog.math.Coordinate(
-    (e.pageX ? e.pageX : e.changedTouches[0].pageX),
-    (e.pageY ? e.pageY : e.changedTouches[0].pageY)
+      (e.pageX ? e.pageX : e.changedTouches[0].pageX),
+      (e.pageY ? e.pageY : e.changedTouches[0].pageY)
   );
 };

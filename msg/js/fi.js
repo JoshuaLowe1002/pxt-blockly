@@ -7,7 +7,7 @@ goog.provide('Blockly.Msg.fi');
 goog.require('Blockly.Msg');
 
 Blockly.Msg.ADD_COMMENT = "Lisää kommentti";
-Blockly.Msg.CANNOT_DELETE_VARIABLE_PROCEDURE = "Can't delete the variable '%1' because it's part of the definition of the function '%2'";  // untranslated
+Blockly.Msg.CANNOT_DELETE_VARIABLE_PROCEDURE = "Ei voida poistaa muuttujaa '%1' koska se on osa funktion määritelmää '%2'";
 Blockly.Msg.CHANGE_VALUE_TITLE = "Muuta arvoa:";
 Blockly.Msg.CLEAN_UP = "Siivoa lohkot";
 Blockly.Msg.COLLAPSE_ALL = "Sulje lohkot";
@@ -78,8 +78,8 @@ Blockly.Msg.IOS_CANCEL = "Peruuta";
 Blockly.Msg.IOS_ERROR = "Virhe";
 Blockly.Msg.IOS_OK = "OK";
 Blockly.Msg.IOS_PROCEDURES_ADD_INPUT = "+ Lisää syöte";
-Blockly.Msg.IOS_PROCEDURES_ALLOW_STATEMENTS = "Allow statements";  // untranslated
-Blockly.Msg.IOS_PROCEDURES_DUPLICATE_INPUTS_ERROR = "This function has duplicate inputs.";  // untranslated
+Blockly.Msg.IOS_PROCEDURES_ALLOW_STATEMENTS = "Salli selostukset";
+Blockly.Msg.IOS_PROCEDURES_DUPLICATE_INPUTS_ERROR = "Tällä toiminnolla on päällekkäisiä syöttöjä.";
 Blockly.Msg.IOS_PROCEDURES_INPUTS = "SYÖTTEET";
 Blockly.Msg.IOS_VARIABLES_ADD_BUTTON = "Lisää";
 Blockly.Msg.IOS_VARIABLES_ADD_VARIABLE = "+ Lisää muuttuja";
@@ -281,8 +281,12 @@ Blockly.Msg.MATH_TRIG_TOOLTIP_ATAN = "Palauttaa luvun arkustangentin.";
 Blockly.Msg.MATH_TRIG_TOOLTIP_COS = "Palauttaa asteluvun (ei radiaanin) kosinin.";
 Blockly.Msg.MATH_TRIG_TOOLTIP_SIN = "Palauttaa asteluvun (ei radiaanin) sinin.";
 Blockly.Msg.MATH_TRIG_TOOLTIP_TAN = "Palauttaa asteluvun (ei radiaanin) tangentin.";
+Blockly.Msg.NEW_COLOUR_VARIABLE = "Luo värimuuttuja...";
+Blockly.Msg.NEW_NUMBER_VARIABLE = "Luo numeromuuttuja...";
+Blockly.Msg.NEW_STRING_VARIABLE = "Create string variable...";  // untranslated
 Blockly.Msg.NEW_VARIABLE = "Luo muuttuja...";
 Blockly.Msg.NEW_VARIABLE_TITLE = "Uuden muuttujan nimi:";
+Blockly.Msg.NEW_VARIABLE_TYPE_TITLE = "New variable type:";  // untranslated
 Blockly.Msg.NOTE_PICKER_HELPURL = "https://en.wikipedia.org/wiki/Piano_key_frequencies";  // untranslated
 Blockly.Msg.NOTE_PICKER_TOOLTIP = "Choose a note from the piano.";  // untranslated
 Blockly.Msg.ORDINAL_NUMBER_SUFFIX = "";  // untranslated
@@ -425,3 +429,4 @@ Blockly.Msg.VARIABLES_HUE = "330";
 Blockly.Msg.TEXTS_HUE = "160";
 Blockly.Msg.PROCEDURES_HUE = "290";
 Blockly.Msg.COLOUR_HUE = "20";
+Blockly.Msg.VARIABLES_DYNAMIC_HUE = "310";

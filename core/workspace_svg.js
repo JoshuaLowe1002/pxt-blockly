@@ -1,7 +1,4 @@
 /**
- * This file has been modified by Microsoft on Feb/2017.
- */
-/**
  * @license
  * Visual Blocks Editor
  *
@@ -33,12 +30,14 @@ goog.provide('Blockly.WorkspaceSvg');
 //goog.require('Blockly.BlockSvg');
 goog.require('Blockly.ConnectionDB');
 goog.require('Blockly.constants');
+goog.require('Blockly.Events.BlockCreate');
 goog.require('Blockly.TouchGesture');
 goog.require('Blockly.Grid');
 goog.require('Blockly.Options');
 goog.require('Blockly.ScrollbarPair');
 goog.require('Blockly.Touch');
 goog.require('Blockly.Trashcan');
+goog.require('Blockly.VariablesDynamic');
 goog.require('Blockly.Workspace');
 goog.require('Blockly.WorkspaceAudio');
 goog.require('Blockly.WorkspaceDragSurfaceSvg');
@@ -105,10 +104,18 @@ Blockly.WorkspaceSvg = function(options, opt_blockDragSurface, opt_wsDragSurface
   this.grid_ = this.options.gridPattern ?
       new Blockly.Grid(options.gridPattern, options.gridOptions) : null;
 
-  this.registerToolboxCategoryCallback(Blockly.VARIABLE_CATEGORY_NAME,
-      Blockly.Variables.flyoutCategory);
-  this.registerToolboxCategoryCallback(Blockly.PROCEDURE_CATEGORY_NAME,
-      Blockly.Procedures.flyoutCategory);
+  if (Blockly.Variables && Blockly.Variables.flyoutCategory) {
+    this.registerToolboxCategoryCallback(Blockly.VARIABLE_CATEGORY_NAME,
+        Blockly.Variables.flyoutCategory);
+  }
+  if (Blockly.VariablesDynamic && Blockly.VariablesDynamic.flyoutCategory) {
+    this.registerToolboxCategoryCallback(Blockly.VARIABLE_DYNAMIC_CATEGORY_NAME,
+        Blockly.VariablesDynamic.flyoutCategory);
+  }
+  if (Blockly.Procedures && Blockly.Procedures.flyoutCategory) {
+    this.registerToolboxCategoryCallback(Blockly.PROCEDURE_CATEGORY_NAME,
+        Blockly.Procedures.flyoutCategory);
+  }
 };
 goog.inherits(Blockly.WorkspaceSvg, Blockly.Workspace);
 
@@ -199,7 +206,7 @@ Blockly.WorkspaceSvg.prototype.scrollbar = null;
 
 /**
  * The current gesture in progress on this workspace, if any.
- * @type {Blockly.TouchGesture}
+ * @type {Blockly.Gesture}
  * @private
  */
 Blockly.WorkspaceSvg.prototype.currentGesture_ = null;
@@ -260,6 +267,21 @@ Blockly.WorkspaceSvg.prototype.flyoutButtonCallbacks_ = {};
  * @private
  */
 Blockly.WorkspaceSvg.prototype.toolboxCategoryCallbacks_ = {};
+
+/**
+ * Developers may define this function to add custom menu options to the
+ * workspace's context menu or edit the workspace-created set of menu options.
+ * @param {!Array.<!Object>} options List of menu options to add to.
+ */
+Blockly.WorkspaceSvg.prototype.configureContextMenu = null;
+
+/**
+ * In a flyout, the target workspace where blocks should be placed after a drag.
+ * Otherwise null.
+ * @type {?Blockly.WorkspaceSvg}
+ * @package
+ */
+Blockly.WorkspaceSvg.prototype.targetWorkspace = null;
 
 /**
  * Inverted screen CTM, for use in mouseToSvg.
@@ -382,12 +404,12 @@ Blockly.WorkspaceSvg.prototype.createDom = function(opt_backgroundClass) {
     bottom = this.addTrashcan_(bottom);
   }
   if (this.options.zoomOptions && this.options.zoomOptions.controls) {
-    bottom = this.addZoomControls_(bottom);
+    this.addZoomControls_(bottom);
   }
 
   if (!this.isFlyout) {
     Blockly.bindEventWithChecks_(this.svgGroup_, 'mousedown', this,
-        this.onMouseDown_);
+        this.onMouseDown_, false, true);
     if (this.options.zoomOptions && this.options.zoomOptions.wheel) {
       // Mouse-wheel.
       Blockly.bindEventWithChecks_(this.svgGroup_, 'wheel', this,
@@ -467,7 +489,7 @@ Blockly.WorkspaceSvg.prototype.dispose = function() {
   }
   if (!this.options.parentWorkspace) {
     // Top-most workspace.  Dispose of the div that the
-    // svg is injected into (i.e. injectionDiv).
+    // SVG is injected into (i.e. injectionDiv).
     goog.dom.removeNode(this.getParentSvg().parentNode);
   }
   if (this.resizeHandlerWrapper_) {
@@ -544,7 +566,7 @@ Blockly.WorkspaceSvg.prototype.addFlyout_ = function(tagName) {
   this.flyout_.autoClose = false;
 
   // Return the element  so that callers can place it in their desired
-  // spot in the dom.  For exmaple, mutator flyouts do not go in the same place
+  // spot in the DOM.  For example, mutator flyouts do not go in the same place
   // as main workspace flyouts.
   return this.flyout_.createDom(tagName);
 };
@@ -564,6 +586,15 @@ Blockly.WorkspaceSvg.prototype.getFlyout_ = function() {
     return this.toolbox_.flyout_;
   }
   return null;
+};
+
+/**
+ * Getter for the toolbox associated with this workspace, if one exists.
+ * @return {Blockly.Toolbox} The toolbox on this workspace.
+ * @package
+ */
+Blockly.WorkspaceSvg.prototype.getToolbox = function() {
+  return this.toolbox_;
 };
 
 /**
@@ -628,7 +659,7 @@ Blockly.WorkspaceSvg.prototype.resize = function() {
  */
 Blockly.WorkspaceSvg.prototype.updateScreenCalculationsIfScrolled =
     function() {
-  /* eslint-disable indent */
+    /* eslint-disable indent */
   var currScroll = goog.dom.getDocumentScroll();
   if (!goog.math.Coordinate.equals(this.lastRecordedPageScroll_,
      currScroll)) {
@@ -740,12 +771,21 @@ Blockly.WorkspaceSvg.prototype.setupDragSurface = function() {
   // Figure out where we want to put the canvas back.  The order
   // in the is important because things are layered.
   var previousElement = this.svgBlockCanvas_.previousSibling;
-  var width = this.getParentSvg().getAttribute('width');
-  var height = this.getParentSvg().getAttribute('height');
+  var width = parseInt(this.getParentSvg().getAttribute('width'), 10);
+  var height = parseInt(this.getParentSvg().getAttribute('height'), 10);
   var coord = Blockly.utils.getRelativeXY(this.svgBlockCanvas_);
   this.workspaceDragSurface_.setContentsAndShow(this.svgBlockCanvas_,
       this.svgBubbleCanvas_, previousElement, width, height, this.scale);
   this.workspaceDragSurface_.translateSurface(coord.x, coord.y);
+};
+
+/**
+ * @return {?Blockly.BlockDragSurfaceSvg} This workspace's block drag surface,
+ *     if one is in use.
+ * @package
+ */
+Blockly.WorkspaceSvg.prototype.getBlockDragSurface = function() {
+  return this.blockDragSurface_;
 };
 
 /**
@@ -914,23 +954,13 @@ Blockly.WorkspaceSvg.prototype.paste = function(xmlBlock) {
 
 /**
  * Refresh the toolbox unless there's a drag in progress.
- * @private
- */
-Blockly.WorkspaceSvg.prototype.refreshToolboxSelection_ = function() {
-  if (this.toolbox_ && this.toolbox_.flyout_ && !this.currentGesture_) {
-    this.toolbox_.refreshSelection();
-  }
-};
-
-/**
- * Rename a variable by updating its name in the variable list.
- * @param {string} oldName Variable to rename.
- * @param {string} newName New variable name.
  * @package
  */
-Blockly.WorkspaceSvg.prototype.renameVariable = function(oldName, newName) {
-  Blockly.WorkspaceSvg.superClass_.renameVariable.call(this, oldName, newName);
-  this.refreshToolboxSelection_();
+Blockly.WorkspaceSvg.prototype.refreshToolboxSelection = function() {
+  var ws = this.isFlyout ? this.targetWorkspace : this;
+  if (ws && !ws.currentGesture_ && ws.toolbox_ && ws.toolbox_.flyout_) {
+    ws.toolbox_.refreshSelection();
+  }
 };
 
 /**
@@ -942,18 +972,7 @@ Blockly.WorkspaceSvg.prototype.renameVariable = function(oldName, newName) {
  */
 Blockly.WorkspaceSvg.prototype.renameVariableById = function(id, newName) {
   Blockly.WorkspaceSvg.superClass_.renameVariableById.call(this, id, newName);
-  this.refreshToolboxSelection_();
-};
-
-/**
- * Delete a variable by the passed in name.   Update the flyout to show
- *     immediately that the variable is deleted.
- * @param {string} name Name of variable to delete.
- * @package
- */
-Blockly.WorkspaceSvg.prototype.deleteVariable = function(name) {
-  Blockly.WorkspaceSvg.superClass_.deleteVariable.call(this, name);
-  this.refreshToolboxSelection_();
+  this.refreshToolboxSelection();
 };
 
 /**
@@ -964,7 +983,7 @@ Blockly.WorkspaceSvg.prototype.deleteVariable = function(name) {
  */
 Blockly.WorkspaceSvg.prototype.deleteVariableById = function(id) {
   Blockly.WorkspaceSvg.superClass_.deleteVariableById.call(this, id);
-  this.refreshToolboxSelection_();
+  this.refreshToolboxSelection();
 };
 
 /**
@@ -980,9 +999,9 @@ Blockly.WorkspaceSvg.prototype.deleteVariableById = function(id) {
  * @package
  */
 Blockly.WorkspaceSvg.prototype.createVariable = function(name, opt_type, opt_id) {
-  var newVar = Blockly.WorkspaceSvg.superClass_.createVariable.call(this, name,
-    opt_type, opt_id);
-  this.refreshToolboxSelection_();
+  var newVar = Blockly.WorkspaceSvg.superClass_.createVariable.call(
+      this, name, opt_type, opt_id);
+  this.refreshToolboxSelection();
   return newVar;
 };
 
@@ -990,7 +1009,7 @@ Blockly.WorkspaceSvg.prototype.createVariable = function(name, opt_type, opt_id)
  * Make a list of all the delete areas for this workspace.
  */
 Blockly.WorkspaceSvg.prototype.recordDeleteAreas = function() {
-  if (this.trashcan) {
+  if (this.trashcan && this.svgGroup_.parentNode) {
     this.deleteAreaTrash_ = this.trashcan.getClientRect();
   } else {
     this.deleteAreaTrash_ = null;
@@ -1298,8 +1317,8 @@ Blockly.WorkspaceSvg.prototype.showContextMenu_ = function(e) {
       if (deleteList.length < 2 ) {
         deleteNext();
       } else {
-        Blockly.confirm(Blockly.Msg.DELETE_ALL_BLOCKS.
-            replace('%1', deleteList.length),
+        Blockly.confirm(
+            Blockly.Msg.DELETE_ALL_BLOCKS.replace('%1', deleteList.length),
             function(ok) {
               if (ok) {
                 deleteNext();
@@ -1309,6 +1328,11 @@ Blockly.WorkspaceSvg.prototype.showContextMenu_ = function(e) {
     }
   };
   menuOptions.push(deleteOption);
+
+  // Allow the developer to add or modify menuOptions.
+  if (this.configureContextMenu) {
+    this.configureContextMenu(menuOptions);
+  }
 
   Blockly.ContextMenu.show(e, menuOptions, this.RTL);
 };
@@ -1332,7 +1356,6 @@ Blockly.WorkspaceSvg.prototype.updateToolbox = function(tree) {
     if (!this.toolbox_) {
       throw 'Existing toolbox has no categories.  Can\'t change mode.';
     }
-    this.options.languageTree = tree;
     // pxtblockly: open expanded node when updating toolbox
     var openNode = this.toolbox_.populate_(tree);
     if (openNode) {
@@ -1340,6 +1363,7 @@ Blockly.WorkspaceSvg.prototype.updateToolbox = function(tree) {
     } else {
       this.toolbox_.flyout_.hide();
     }
+    this.options.languageTree = tree;
     this.toolbox_.populate_(tree);
     this.toolbox_.addColour_();
   } else {
@@ -1608,7 +1632,7 @@ Blockly.WorkspaceSvg.getContentDimensionsExact_ = function(ws) {
 Blockly.WorkspaceSvg.getContentDimensionsBounded_ = function(ws, svgSize) {
   var content = Blockly.WorkspaceSvg.getContentDimensionsExact_(ws);
 
-  // View height and width are both in pixels, and are the same as the svg size.
+  // View height and width are both in pixels, and are the same as the SVG size.
   var viewWidth = svgSize.width;
   var viewHeight = svgSize.height;
   var halfWidth = viewWidth / 2;
@@ -1841,7 +1865,7 @@ Blockly.WorkspaceSvg.prototype.removeToolboxCategoryCallback = function(key) {
 /**
  * Look up the gesture that is tracking this touch stream on this workspace.
  * May create a new gesture.
- * @param {!Event} e Mouse event or touch event
+ * @param {!Event} e Mouse event or touch event.
  * @return {Blockly.TouchGesture} The gesture that is tracking this touch stream,
  *     or null if no valid gesture exists.
  * @package
