@@ -1,9 +1,6 @@
 /**
  * @license
- * Visual Blocks Editor
- *
- * Copyright 2016 Google Inc.
- * https://developers.google.com/blockly/
+ * Copyright 2016 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,8 +23,10 @@
 
 goog.provide('Blockly.FlyoutButton');
 
-goog.require('goog.dom');
-goog.require('goog.math.Coordinate');
+goog.require('Blockly.Css');
+goog.require('Blockly.utils');
+goog.require('Blockly.utils.Coordinate');
+goog.require('Blockly.utils.dom');
 
 
 /**
@@ -49,7 +48,7 @@ Blockly.FlyoutButton = function(workspace, targetWorkspace, xml, isLabel) {
   this.workspace_ = workspace;
 
   /**
-   * @type {!Blockly.Workspace}
+   * @type {!Blockly.WorkspaceSvg}
    * @private
    */
   this.targetWorkspace_ = targetWorkspace;
@@ -61,10 +60,10 @@ Blockly.FlyoutButton = function(workspace, targetWorkspace, xml, isLabel) {
   this.text_ = xml.getAttribute('text');
 
   /**
-   * @type {!goog.math.Coordinate}
+   * @type {!Blockly.utils.Coordinate}
    * @private
    */
-  this.position_ = new goog.math.Coordinate(0, 0);
+  this.position_ = new Blockly.utils.Coordinate(0, 0);
 
   /**
    * Whether this button should be styled as a label.
@@ -74,21 +73,21 @@ Blockly.FlyoutButton = function(workspace, targetWorkspace, xml, isLabel) {
   this.isLabel_ = isLabel;
 
   /**
-   * Function to call when this button is clicked.
-   * @type {function(!Blockly.FlyoutButton)}
+   * If specified, add a help icon to the right of the label.
+   * @type {?string}
    * @private
    */
-  this.callback_ = null;
+  this.helpButtonIcon_ = xml.getAttribute('web-help-button') || null;
 
-  var callbackKey = xml.getAttribute('callbackkey');
-  if (this.isLabel_ && callbackKey) {
-    console.warn('Labels should not have callbacks. Label text: ' + this.text_);
-  } else if (!this.isLabel_ &&
-      !(callbackKey && targetWorkspace.getButtonCallback(callbackKey))) {
-    console.warn('Buttons should have callbacks. Button text: ' + this.text_);
-  } else {
-    this.callback_ = targetWorkspace.getButtonCallback(callbackKey);
-  }
+  /**
+   * The key to the function called when this button is clicked.
+   * TODO shakao check if callbackkey changes needed pxt-blockly/commit/3dc9e08f9add5147ab42946692017bac953cf9ad
+   * @type {string}
+   * @private
+   */
+  this.callbackKey_ = xml.getAttribute('callbackKey') ||
+  /* Check the lower case version too to satisfy IE */
+                      xml.getAttribute('callbackkey');
 
   /**
    * If specified, a CSS class to add to this button.
@@ -113,6 +112,13 @@ Blockly.FlyoutButton = function(workspace, targetWorkspace, xml, isLabel) {
    */
   this.line_ = xml.getAttribute('web-line') || null;
   this.lineWidth_ = xml.getAttribute('web-line-width') || null;
+
+  /**
+   * Mouse up event data.
+   * @type {?Blockly.EventData}
+   * @private
+   */
+  this.onMouseUpWrapper_ = null;
 };
 
 /**
@@ -137,11 +143,11 @@ Blockly.FlyoutButton.prototype.height = 40; // Can't be computed like the width
  * @type {Array.<!Array>}
  * @private
  */
-Blockly.FlyoutButton.prototype.onMouseUpWrapper_ = null;
+Blockly.FlyoutButton.HELP_IMAGE_URI = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjYiIGhlaWdodD0iMjYiIHZpZXdCb3g9IjAgMCAyNiAyNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTMiIGN5PSIxMyIgcj0iMTMiIGZpbGw9IndoaXRlIi8+CjxwYXRoIGQ9Ik0xNy45NTIgOS4xODQwMkMxNy45NTIgMTAuMjU2IDE3LjgxNiAxMS4wNzIgMTcuNTQ0IDExLjYzMkMxNy4yODggMTIuMTkyIDE2Ljc1MiAxMi43OTIgMTUuOTM2IDEzLjQzMkMxNS4xMiAxNC4wNzIgMTQuNTc2IDE0LjU4NCAxNC4zMDQgMTQuOTY4QzE0LjA0OCAxNS4zMzYgMTMuOTIgMTUuNzM2IDEzLjkyIDE2LjE2OFYxNi45NkgxMS44MDhDMTEuNDI0IDE2LjQ2NCAxMS4yMzIgMTUuODQgMTEuMjMyIDE1LjA4OEMxMS4yMzIgMTQuNjg4IDExLjM4NCAxNC4yODggMTEuNjg4IDEzLjg4OEMxMS45OTIgMTMuNDg4IDEyLjUzNiAxMi45NjggMTMuMzIgMTIuMzI4QzE0LjEwNCAxMS42NzIgMTQuNjI0IDExLjE2OCAxNC44OCAxMC44MTZDMTUuMTM2IDEwLjQ0OCAxNS4yNjQgOS45NjgwMiAxNS4yNjQgOS4zNzYwMkMxNS4yNjQgOC4yMDgwMiAxNC40MTYgNy42MjQwMiAxMi43MiA3LjYyNDAyQzExLjc2IDcuNjI0MDIgMTAuNzUyIDcuNzM2MDIgOS42OTYgNy45NjAwMkw5LjE0NCA4LjA4MDAyTDkgNi4wODgwMkMxMC40ODggNS41NjAwMiAxMS44NCA1LjI5NjAyIDEzLjA1NiA1LjI5NjAyQzE0LjczNiA1LjI5NjAyIDE1Ljk2OCA1LjYwODAyIDE2Ljc1MiA2LjIzMjAyQzE3LjU1MiA2Ljg0MDAyIDE3Ljk1MiA3LjgyNDAyIDE3Ljk1MiA5LjE4NDAyWk0xMS40IDIyVjE4LjY0SDE0LjE4NFYyMkgxMS40WiIgZmlsbD0iIzU5NUU3NCIvPgo8L3N2Zz4K';
 
 /**
  * Create the button elements.
- * @return {!Element} The button's SVG group.
+ * @return {!SVGElement} The button's SVG group.
  */
 Blockly.FlyoutButton.prototype.createDom = function() {
   var cssClass = this.isLabel_ ? 'blocklyFlyoutLabel' : 'blocklyFlyoutButton';
@@ -149,12 +155,12 @@ Blockly.FlyoutButton.prototype.createDom = function() {
     cssClass += ' ' + this.cssClass_;
   }
 
-  this.svgGroup_ = Blockly.utils.createSvgElement('g', {'class': cssClass},
+  this.svgGroup_ = Blockly.utils.dom.createSvgElement('g', {'class': cssClass},
       this.workspace_.getCanvas());
 
   if (!this.isLabel_) {
     // Shadow rectangle (light source does not mirror in RTL).
-    var shadow = Blockly.utils.createSvgElement('rect',
+    var shadow = Blockly.utils.dom.createSvgElement('rect',
         {
           'class': 'blocklyFlyoutButtonShadow',
           'rx': 4, 'ry': 4, 'x': 1, 'y': 1
@@ -162,7 +168,7 @@ Blockly.FlyoutButton.prototype.createDom = function() {
         this.svgGroup_);
   }
   // Background rectangle.
-  var rect = Blockly.utils.createSvgElement('rect',
+  var rect = Blockly.utils.dom.createSvgElement('rect',
       {
         'class': this.isLabel_ ?
             'blocklyFlyoutLabelBackground' : 'blocklyFlyoutButtonBackground',
@@ -170,7 +176,7 @@ Blockly.FlyoutButton.prototype.createDom = function() {
       },
       this.svgGroup_);
 
-  var svgText = Blockly.utils.createSvgElement('text',
+  var svgText = Blockly.utils.dom.createSvgElement('text',
       {
         'class': this.isLabel_ ? 'blocklyFlyoutLabelText' : 'blocklyText',
         'x': 0,
@@ -178,30 +184,61 @@ Blockly.FlyoutButton.prototype.createDom = function() {
         'text-anchor': 'middle'
       },
       this.svgGroup_);
-  svgText.textContent = this.text_;
+  var text = Blockly.utils.replaceMessageReferences(this.text_);
+  if (this.workspace_.RTL) {
+    // Force text to be RTL by adding an RLM.
+    text += '\u200F';
+  }
+  svgText.textContent = text;
+  if (this.isLabel_) {
+    this.svgText_ = svgText;
+    this.workspace_.getThemeManager().subscribe(this.svgText_,
+        'flyoutForegroundColour', 'fill');
+  }
 
-  this.width = Blockly.Field.getCachedWidth(svgText);
+  this.width = Blockly.utils.dom.getTextWidth(svgText);
+
   // pxtblockly: support for icons in toolbox labels
   if (this.icon_ || this.iconClass_) {
-    var svgIcon = Blockly.utils.createSvgElement('text',
+    var svgIcon = Blockly.utils.dom.createSvgElement('text',
         {'class': this.iconClass_ ? 'blocklyFlyoutLabelIcon ' + this.iconClass_ : 'blocklyFlyoutLabelIcon',
-          'x': 0, 'y': 0, 'text-anchor': 'middle'},
+          'x': 0, 'y': 0, 'text-anchor': 'start'},
         this.svgGroup_);
     if (this.icon_) svgIcon.textContent = this.icon_;
     if (this.iconColor_) svgIcon.setAttribute('style', 'fill: ' + this.iconColor_);
 
-    this.width += svgIcon.getComputedTextLength() + 2 * Blockly.FlyoutButton.MARGIN;
-
-    svgIcon.setAttribute('text-anchor', 'end');
     svgIcon.setAttribute('dominant-baseline', 'central');
-    svgIcon.setAttribute('dy', goog.userAgent.EDGE_OR_IE ?
+    svgIcon.setAttribute('dy', Blockly.utils.userAgent.EDGE_OR_IE ?
       Blockly.Field.IE_TEXT_OFFSET : '0');
-    svgIcon.setAttribute('x', this.targetWorkspace_.RTL ? this.width : Blockly.FlyoutButton.MARGIN);
+    svgIcon.setAttribute('x', this.targetWorkspace_.RTL ? this.width + Blockly.FlyoutButton.MARGIN : 0);
     svgIcon.setAttribute('y', this.height / 2);
+
+    this.width += Blockly.utils.dom.getTextWidth(svgIcon) + Blockly.FlyoutButton.MARGIN;
+  }
+
+  if (this.helpButtonIcon_) {
+    var helpButtonWidth = 25;
+    var helpButtonMarginX = 15;
+    var helpButtonMarginY = 10;
+    var helpButtonX = this.workspace_.RTL ?
+      - this.width + Blockly.FlyoutButton.MARGIN + helpButtonMarginX :
+      this.width + helpButtonMarginX;
+    this.helpButtonImage_ = Blockly.utils.dom.createSvgElement(
+        'image',
+        {
+          'class': 'blocklyFlyoutButton',
+          'height': helpButtonWidth + 'px',
+          'width': helpButtonWidth + 'px',
+          'x': helpButtonX + 'px',
+          'y': helpButtonMarginY + 'px'
+        },
+        this.svgGroup_);
+    this.helpButtonImage_.setAttributeNS('http://www.w3.org/1999/xlink',
+        'xlink:href', Blockly.FlyoutButton.HELP_IMAGE_URI);
   }
 
   if (this.line_) {
-    var svgLine = Blockly.utils.createSvgElement('line',
+    var svgLine = Blockly.utils.dom.createSvgElement('line',
         {'class': 'blocklyFlyoutLine', 'stroke-dasharray': this.line_,
           'text-anchor': 'middle'},
         this.svgGroup_);
@@ -221,13 +258,16 @@ Blockly.FlyoutButton.prototype.createDom = function() {
 
   svgText.setAttribute('text-anchor', 'middle');
   svgText.setAttribute('dominant-baseline', 'central');
-  svgText.setAttribute('dy', goog.userAgent.EDGE_OR_IE ?
+  svgText.setAttribute('dy', Blockly.utils.userAgent.EDGE_OR_IE ?
     Blockly.Field.IE_TEXT_OFFSET : '0');
   svgText.setAttribute('x', this.width / 2);
   svgText.setAttribute('y', this.height / 2);
 
-  this.mouseUpWrapper_ = Blockly.bindEventWithChecks_(this.svgGroup_, 'mouseup',
-      this, this.onMouseUp_);
+  // pxt-blockly: flyout help button
+  var buttonHitTarget = this.helpButtonIcon_ && this.callback_ ?
+      this.helpButtonImage_ : this.svgGroup_;
+  this.onMouseUpWrapper_ = Blockly.bindEventWithChecks_(
+      buttonHitTarget, 'mouseup', this, this.onMouseUp_);
   return this.svgGroup_;
 };
 
@@ -261,7 +301,7 @@ Blockly.FlyoutButton.prototype.moveTo = function(x, y) {
 
 /**
  * Location of the button.
- * @return {!goog.math.Coordinate} x, y coordinates.
+ * @return {!Blockly.utils.Coordinate} x, y coordinates.
  * @package
  */
 Blockly.FlyoutButton.prototype.getPosition = function() {
@@ -288,7 +328,7 @@ Blockly.FlyoutButton.prototype.getText = function() {
 
 /**
  * Get the position of this button.
- * @return {!goog.math.Coordinate} The button position.
+ * @return {!Blockly.utils.Coordinate} The button position.
  * @package
  */
 Blockly.FlyoutButton.prototype.getPosition = function() {
@@ -303,11 +343,11 @@ Blockly.FlyoutButton.prototype.dispose = function() {
     Blockly.unbindEvent_(this.onMouseUpWrapper_);
   }
   if (this.svgGroup_) {
-    goog.dom.removeNode(this.svgGroup_);
-    this.svgGroup_ = null;
+    Blockly.utils.dom.removeNode(this.svgGroup_);
   }
-  this.workspace_ = null;
-  this.targetWorkspace_ = null;
+  if (this.svgText_) {
+    this.workspace_.getThemeManager().unsubscribe(this.svgText_);
+  }
 };
 
 /**
@@ -321,8 +361,55 @@ Blockly.FlyoutButton.prototype.onMouseUp_ = function(e) {
     gesture.cancel();
   }
 
-  // Call the callback registered to this button.
-  if (this.callback_) {
-    this.callback_(this);
+  if (this.isLabel_ && this.callbackKey_) {
+    console.warn('Labels should not have callbacks. Label text: ' + this.text_);
+  } else if (!this.isLabel_ && !(this.callbackKey_ &&
+      this.targetWorkspace_.getButtonCallback(this.callbackKey_))) {
+    console.warn('Buttons should have callbacks. Button text: ' + this.text_);
+  } else if (!this.isLabel_) {
+    this.targetWorkspace_.getButtonCallback(this.callbackKey_)(this);
   }
 };
+
+/**
+ * CSS for buttons and labels.  See css.js for use.
+ */
+Blockly.Css.register([
+  /* eslint-disable indent */
+  '.blocklyFlyoutButton {',
+    'fill: #F4F4F4;',
+  '}',
+
+  '.blocklyFlyoutButtonBackground {',
+      'stroke: #fff;',
+  '}',
+
+  '.blocklyFlyoutButton .blocklyText {',
+    'fill: $colour_text;',
+  '}',
+
+  '.blocklyFlyoutButtonShadow {',
+    'fill: none;',
+  '}',
+
+  '.blocklyFlyoutButton:hover {',
+    'fill: #EAEAEA;',
+    'cursor: pointer;',
+  '}',
+
+  '.blocklyFlyoutLabel {',
+    'cursor: default;',
+  '}',
+
+  '.blocklyFlyoutLabelBackground {',
+    'opacity: 0;',
+  '}',
+
+  '.blocklyFlyoutLabelText {',
+    'font-family: "Helvetica Neue", "Segoe UI", Helvetica, sans-serif;',
+    'font-size: 14pt;',
+    'fill: $colour_text;',
+    'font-weight: bold;',
+  '}'
+  /* eslint-enable indent */
+]);

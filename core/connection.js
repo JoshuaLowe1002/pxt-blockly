@@ -3,10 +3,7 @@
  */
 /**
  * @license
- * Visual Blocks Editor
- *
- * Copyright 2011 Google Inc.
- * https://developers.google.com/blockly/
+ * Copyright 2011 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,10 +26,9 @@
 
 goog.provide('Blockly.Connection');
 
+goog.require('Blockly.Events');
 goog.require('Blockly.Events.BlockMove');
-
-goog.require('goog.asserts');
-goog.require('goog.dom');
+goog.require('Blockly.Xml');
 
 
 /**
@@ -49,13 +45,6 @@ Blockly.Connection = function(source, type) {
   this.sourceBlock_ = source;
   /** @type {number} */
   this.type = type;
-  // Shortcut for the databases for this connection's workspace.
-  if (source.workspace.connectionDBList) {
-    this.db_ = source.workspace.connectionDBList[type];
-    this.dbOpposite_ =
-        source.workspace.connectionDBList[Blockly.OPPOSITE_TYPE[type]];
-    this.hidden_ = !this.db_;
-  }
 };
 
 /**
@@ -78,9 +67,16 @@ Blockly.Connection.REASON_CUSTOM_PROCEDURE = 7;
 Blockly.Connection.prototype.targetConnection = null;
 
 /**
+ * Has this connection been disposed of?
+ * @type {boolean}
+ * @package
+ */
+Blockly.Connection.prototype.disposed = false;
+
+/**
  * List of compatible value types.  Null if all types are compatible.
  * @type {Array}
- * @private
+ * @package pxt-blockly
  */
 Blockly.Connection.prototype.check_ = null;
 
@@ -94,45 +90,16 @@ Blockly.Connection.prototype.shadowDom_ = null;
 /**
  * Horizontal location of this connection.
  * @type {number}
- * @protected
+ * @package
  */
-Blockly.Connection.prototype.x_ = 0;
+Blockly.Connection.prototype.x = 0;
 
 /**
  * Vertical location of this connection.
  * @type {number}
- * @protected
+ * @package
  */
-Blockly.Connection.prototype.y_ = 0;
-
-/**
- * Has this connection been added to the connection database?
- * @type {boolean}
- * @protected
- */
-Blockly.Connection.prototype.inDB_ = false;
-
-/**
- * Connection database for connections of this type on the current workspace.
- * @type {Blockly.ConnectionDB}
- * @protected
- */
-Blockly.Connection.prototype.db_ = null;
-
-/**
- * Connection database for connections compatible with this type on the
- * current workspace.
- * @type {Blockly.ConnectionDB}
- * @protected
- */
-Blockly.Connection.prototype.dbOpposite_ = null;
-
-/**
- * Whether this connections is hidden (not tracked in a database) or not.
- * @type {boolean}
- * @protected
- */
-Blockly.Connection.prototype.hidden_ = null;
+Blockly.Connection.prototype.y = 0;
 
 /**
  * Connect two connections together.  This is the connection on the superior
@@ -169,19 +136,18 @@ Blockly.Connection.prototype.connect_ = function(childConnection) {
     if (orphanBlock.isShadow()) {
       // Save the shadow block so that field values are preserved.
       shadowDom = Blockly.Xml.blockToDom(orphanBlock);
-      orphanBlock.dispose();
+      orphanBlock.dispose(false);
       orphanBlock = null;
-      
     } /*else if (parentConnection.type == Blockly.INPUT_VALUE) {
       // Value connections.
       // If female block is already connected, disconnect and bump the male.
       if (!orphanBlock.outputConnection) {
-        throw 'Orphan block does not have an output connection.';
+        throw Error('Orphan block does not have an output connection.');
       }
       // Attempt to reattach the orphan at the end of the newly inserted
       // block.  Since this block may be a row, walk down to the end
       // or to the first (and only) shadow block.
-      var connection = Blockly.Connection.lastConnectionInRow_(
+      var connection = Blockly.Connection.lastConnectionInRow(
           childBlock, orphanBlock);
       if (connection) {
         orphanBlock.outputConnection.connect(connection);
@@ -192,7 +158,7 @@ Blockly.Connection.prototype.connect_ = function(childConnection) {
       // Statement blocks may be inserted into the middle of a stack.
       // Split the stack.
       if (!orphanBlock.previousConnection) {
-        throw 'Orphan block does not have a previous connection.';
+        throw Error('Orphan block does not have a previous connection.');
       }
       // Attempt to reattach the orphan at the bottom of the newly inserted
       // block.  Since this block may be a stack, walk down to the end.
@@ -202,7 +168,7 @@ Blockly.Connection.prototype.connect_ = function(childConnection) {
         if (nextBlock && !nextBlock.isShadow()) {
           newBlock = nextBlock;
         } else {
-          if (orphanBlock.previousConnection.checkType_(
+          if (orphanBlock.previousConnection.checkType(
               newBlock.nextConnection)) {
             newBlock.nextConnection.connect(orphanBlock.previousConnection);
             orphanBlock = null;
@@ -222,9 +188,9 @@ Blockly.Connection.prototype.connect_ = function(childConnection) {
           if (orphanBlock.workspace && !orphanBlock.getParent()) {
             Blockly.Events.setGroup(group);
             if (orphanBlock.outputConnection) {
-              orphanBlock.outputConnection.bumpAwayFrom_(parentConnection);
+              orphanBlock.outputConnection.onFailedConnect(parentConnection);
             } else if (orphanBlock.previousConnection) {
-              orphanBlock.previousConnection.bumpAwayFrom_(parentConnection);
+              orphanBlock.previousConnection.onFailedConnect(parentConnection);
             }
             Blockly.Events.setGroup(false);
           }
@@ -254,17 +220,25 @@ Blockly.Connection.prototype.connect_ = function(childConnection) {
 };
 
 /**
- * Sever all links to this connection (not including from the source object).
+ * Dispose of this connection and deal with connected blocks.
+ * @package
  */
 Blockly.Connection.prototype.dispose = function() {
+
+  // isConnected returns true for shadows and non-shadows.
   if (this.isConnected()) {
-    throw 'Disconnect connection before disposing of it.';
+    this.setShadowDom(null);
+    var targetBlock = this.targetBlock();
+    if (targetBlock.isShadow()) {
+      // Destroy the attached shadow block & its children.
+      targetBlock.dispose(false);
+    } else {
+      // Disconnect the attached normal block.
+      targetBlock.unplug();
+    }
   }
-  if (this.inDB_) {
-    this.db_.removeConnection_(this);
-  }
-  this.db_ = null;
-  this.dbOpposite_ = null;
+
+  this.disposed = true;
 };
 
 /**
@@ -277,7 +251,7 @@ Blockly.Connection.prototype.isConnectedToNonInsertionMarker = function() {
 
 /**
  * Get the source block for this connection.
- * @return {Blockly.Block} The source block, or null if there is none.
+ * @return {!Blockly.Block} The source block.
  */
 Blockly.Connection.prototype.getSourceBlock = function() {
   return this.sourceBlock_;
@@ -306,20 +280,20 @@ Blockly.Connection.prototype.isConnected = function() {
  * @param {Blockly.Connection} target Connection to check compatibility with.
  * @return {number} Blockly.Connection.CAN_CONNECT if the connection is legal,
  *    an error code otherwise.
- * @private
+ * @package
  */
-Blockly.Connection.prototype.canConnectWithReason_ = function(target) {
+Blockly.Connection.prototype.canConnectWithReason = function(target) {
   if (!target) {
     return Blockly.Connection.REASON_TARGET_NULL;
   }
   if (this.isSuperior()) {
     var blockA = this.sourceBlock_;
     var blockB = target.getSourceBlock();
-    var superiorConn = this;
+    // var superiorConn = this; // pxt-blockly: the check that uses this is commented out below
   } else {
     var blockB = this.sourceBlock_;
     var blockA = target.getSourceBlock();
-    var superiorConn = target;
+    // var superiorConn = target; // pxt-blockly: the check that uses this is commented out below
   }
   if (blockA && blockA == blockB) {
     return Blockly.Connection.REASON_SELF_CONNECTION;
@@ -327,9 +301,10 @@ Blockly.Connection.prototype.canConnectWithReason_ = function(target) {
     return Blockly.Connection.REASON_WRONG_TYPE;
   } else if (blockA && blockB && blockA.workspace !== blockB.workspace) {
     return Blockly.Connection.REASON_DIFFERENT_WORKSPACES;
-  } else if (!this.checkType_(target)) {
+  } else if (!this.checkType(target)) {
     return Blockly.Connection.REASON_CHECKS_FAILED;
   // } else if (blockA.isShadow() && !blockB.isShadow()) {
+  //   // pxtblockly: check removed to support nested shadow blocks
   //   return Blockly.Connection.REASON_SHADOW_PARENT;
   // } else if (blockA.type == 'procedures_defnoreturn' &&
   //     blockB.type != 'procedures_callnoreturn_internal' &&
@@ -337,10 +312,7 @@ Blockly.Connection.prototype.canConnectWithReason_ = function(target) {
   //   // Hack to fix #1127: Fail attempts to connect to the custom_block input
   //   // on a defnoreturn block, unless the connecting block is a specific type.
   //   return Blockly.Connection.REASON_CUSTOM_PROCEDURE;
-  // }
-  // pxtblockly: disabled to support nested shadow blocks
-  // else if (blockA.isShadow() && !blockB.isShadow()) {
-  //   return Blockly.Connection.REASON_SHADOW_PARENT;
+  //
   }
   return Blockly.Connection.CAN_CONNECT;
 };
@@ -350,31 +322,31 @@ Blockly.Connection.prototype.canConnectWithReason_ = function(target) {
  * and throws an exception if they are not.
  * @param {Blockly.Connection} target The connection to check compatibility
  *    with.
- * @private
+ * @package
  */
-Blockly.Connection.prototype.checkConnection_ = function(target) {
-  switch (this.canConnectWithReason_(target)) {
+Blockly.Connection.prototype.checkConnection = function(target) {
+  switch (this.canConnectWithReason(target)) {
     case Blockly.Connection.CAN_CONNECT:
       break;
     case Blockly.Connection.REASON_SELF_CONNECTION:
-      throw 'Attempted to connect a block to itself.';
+      throw Error('Attempted to connect a block to itself.');
     case Blockly.Connection.REASON_DIFFERENT_WORKSPACES:
       // Usually this means one block has been deleted.
-      throw 'Blocks not on same workspace.';
+      throw Error('Blocks not on same workspace.');
     case Blockly.Connection.REASON_WRONG_TYPE:
-      throw 'Attempt to connect incompatible types.';
+      throw Error('Attempt to connect incompatible types.');
     case Blockly.Connection.REASON_TARGET_NULL:
-      throw 'Target connection is null.';
+      throw Error('Target connection is null.');
     case Blockly.Connection.REASON_CHECKS_FAILED:
       var msg = 'Connection checks failed. ';
-      msg += this + ' expected '  + this.check_ + ', found ' + target.check_;
-      throw msg;
+      msg += this + ' expected ' + this.check_ + ', found ' + target.check_;
+      throw Error(msg);
     case Blockly.Connection.REASON_SHADOW_PARENT:
-      throw 'Connecting non-shadow to shadow block.';
+      throw Error('Connecting non-shadow to shadow block.');
     case Blockly.Connection.REASON_CUSTOM_PROCEDURE:
-      throw 'Trying to replace a shadow on a custom procedure definition.';
+      throw Error('Trying to replace a shadow on a custom procedure definition.');
     default:
-      throw 'Unknown connection failure: this should never happen!';
+      throw Error('Unknown connection failure: this should never happen!');
   }
 };
 
@@ -394,10 +366,11 @@ Blockly.Connection.prototype.canConnectToPrevious_ = function(candidate) {
   }
 
   // Don't let blocks try to connect to themselves or ones they nest.
-  if (Blockly.draggingConnections_.indexOf(candidate) != -1) {
+  if (Blockly.draggingConnections.indexOf(candidate) != -1) {
     return false;
   }
 
+  // pxt-blockly: Scratch-specific behaviour for connections
   var firstStatementConnection =
       this.sourceBlock_.getFirstStatementConnection();
   // Is it a C-shaped (e.g. repeat) or E-shaped (e.g. if-else) block?
@@ -405,9 +378,9 @@ Blockly.Connection.prototype.canConnectToPrevious_ = function(candidate) {
   var isFirstStatementConnection = this == firstStatementConnection;
   var isNextConnection = this == this.sourceBlock_.nextConnection;
 
-  // Scratch-specific behaviour: can connect to the first statement input of a
-  // C-shaped or E-shaped block, or to the next connection of any statement
-  // block, but not to the second statement input of an E-shaped block.
+  // Can connect to the first statement input of a C-shaped or E-shaped
+  // block, or to the next connection of any statement block, but not to
+  // the second statement input of an E-shaped block.
   if (isComplexStatement && !isFirstStatementConnection && !isNextConnection) {
     return false;
   }
@@ -420,23 +393,19 @@ Blockly.Connection.prototype.canConnectToPrevious_ = function(candidate) {
     return true;
   }
 
-  if (isNextConnection ||
-      (isFirstStatementConnection && !sourceHasPreviousConn)) {
-    // If the candidate is the first connection in a stack, we can connect.
-    if (!candidate.targetConnection) {
-      return true;
-    }
-
-    var targetBlock = candidate.targetBlock();
-    // If it is connected a real block, game over.
-    if (!targetBlock.isInsertionMarker()) {
-      return false;
-    }
-    // If it's connected to an insertion marker but that insertion marker
-    // is the first block in a stack, it's still fine.  If that insertion
-    // marker is in the middle of a stack, it won't work.
-    return !targetBlock.getPreviousBlock();
+  if (!candidate.targetConnection) {
+    return true;
   }
+
+  var targetBlock = candidate.targetBlock();
+  // If it is connected to a real block, game over.
+  if (!targetBlock.isInsertionMarker()) {
+    return false;
+  }
+  // If it's connected to an insertion marker but that insertion marker
+  // is the first block in a stack, it's still fine.  If that insertion
+  // marker is in the middle of a stack, it won't work.
+  return !targetBlock.getPreviousBlock();
 };
 
 /**
@@ -445,16 +414,15 @@ Blockly.Connection.prototype.canConnectToPrevious_ = function(candidate) {
  * connection.
  * @param {!Blockly.Connection} candidate A nearby connection to check.
  * @return {boolean} True if the connection is allowed, false otherwise.
+ * @private
  */
 Blockly.Connection.prototype.isConnectionAllowed = function(candidate) {
-
   // Don't consider insertion markers.
   if (candidate.sourceBlock_.isInsertionMarker()) {
     return false;
   }
-
   // Type checking.
-  var canConnect = this.canConnectWithReason_(candidate);
+  var canConnect = this.canConnectWithReason(candidate);
   if (canConnect != Blockly.Connection.CAN_CONNECT) {
     return false;
   }
@@ -466,35 +434,46 @@ Blockly.Connection.prototype.isConnectionAllowed = function(candidate) {
       return this.canConnectToPrevious_(candidate);
     case Blockly.OUTPUT_VALUE: {
       // Can't drag an input to an output--you have to move the inferior block.
+      // pxt-blockly: return false
       return false;
     }
     case Blockly.INPUT_VALUE: {
       // Offering to connect the left (male) of a value block to an already
       // connected value pair is ok, we'll splice it in.
-      // However, don't offer to splice into an unmovable block.
-      if (candidate.targetConnection &&
+      // However, don't offer to splice into an immovable block.
+      if (candidate.isConnected() &&
           !candidate.targetBlock().isMovable() &&
           !candidate.targetBlock().isShadow()) {
         return false;
       }
+
+      // pxt-blockly: don't allow connecting a block to an argument reporter
+      // shadow.
+      if (candidate.targetConnection) {
+        var targetBlock = candidate.targetBlock();
+        if (targetBlock.isShadow() && Blockly.Functions.isFunctionArgumentReporter(targetBlock)) {
+          return false;
+        }
+      }
+
+      // pxt-blockly: don't allow putting argument reporters outside their
+      // respective function or event handler.
+      if (Blockly.Functions.isFunctionArgumentReporter(this.sourceBlock_)) {
+        // Ensure the root block of this stack has an argument reporter
+        // matching the name and the type of this reporter.
+        var rootBlock = candidate.getSourceBlock().getRootBlock();
+        if (rootBlock.isEnabled() && !Blockly.pxtBlocklyUtils.hasMatchingArgumentReporter(rootBlock, this.sourceBlock_)) {
+          return false;
+        }
+      }
       break;
     }
     case Blockly.NEXT_STATEMENT: {
-        // Scratch-specific behaviour:
-        // If this is a c-block, we can't connect this block's
-        // previous connection unless we're connecting to the end of the last
-        // block on a stack or there's already a block connected inside the c.
-      if (firstStatementConnection &&
-          this == this.sourceBlock_.previousConnection &&
-          candidate.isConnectedToNonInsertionMarker() &&
-          !firstStatementConnection.targetConnection) {
-        return false;
-      }
       // Don't let a block with no next connection bump other blocks out of the
       // stack.  But covering up a shadow block or stack of shadow blocks is
       // fine.  Similarly, replacing a terminal statement with another terminal
       // statement is allowed.
-      if (candidate.isConnectedToNonInsertionMarker() &&
+      if (candidate.isConnected() &&
           !this.sourceBlock_.nextConnection &&
           !candidate.targetBlock().isShadow() &&
           candidate.targetBlock().nextConnection) {
@@ -503,15 +482,25 @@ Blockly.Connection.prototype.isConnectionAllowed = function(candidate) {
       break;
     }
     default:
-      throw 'Unknown connection type in isConnectionAllowed';
+      throw Error('Unknown connection type in isConnectionAllowed');
   }
 
   // Don't let blocks try to connect to themselves or ones they nest.
-  if (Blockly.draggingConnections_.indexOf(candidate) != -1) {
+  if (Blockly.draggingConnections.indexOf(candidate) != -1) {
     return false;
   }
 
   return true;
+};
+
+/**
+ * Behavior after a connection attempt fails.
+ * @param {!Blockly.Connection} _otherConnection Connection that this connection
+ *     failed to connect to.
+ * @package
+ */
+Blockly.Connection.prototype.onFailedConnect = function(_otherConnection) {
+  // NOP
 };
 
 /**
@@ -523,7 +512,11 @@ Blockly.Connection.prototype.connect = function(otherConnection) {
     // Already connected together.  NOP.
     return;
   }
-  this.checkConnection_(otherConnection);
+  this.checkConnection(otherConnection);
+  var eventGroup = Blockly.Events.getGroup();
+  if (!eventGroup) {
+    Blockly.Events.setGroup(true);
+  }
   // Determine which block is superior (higher in the source stack).
   if (this.isSuperior()) {
     // Superior block.
@@ -531,6 +524,9 @@ Blockly.Connection.prototype.connect = function(otherConnection) {
   } else {
     // Inferior block.
     otherConnection.connect_(this);
+  }
+  if (!eventGroup) {
+    Blockly.Events.setGroup(false);
   }
 };
 
@@ -541,7 +537,9 @@ Blockly.Connection.prototype.connect = function(otherConnection) {
  * @private
  */
 Blockly.Connection.connectReciprocally_ = function(first, second) {
-  goog.asserts.assert(first && second, 'Cannot connect null connections.');
+  if (!first || !second) {
+    throw Error('Cannot connect null connections.');
+  }
   first.targetConnection = second;
   second.targetConnection = first;
 };
@@ -556,11 +554,11 @@ Blockly.Connection.connectReciprocally_ = function(first, second) {
  * @private
  */
 Blockly.Connection.singleConnection_ = function(block, orphanBlock) {
-  var connection = false;
+  var connection = null;
   for (var i = 0; i < block.inputList.length; i++) {
     var thisConnection = block.inputList[i].connection;
     if (thisConnection && thisConnection.type == Blockly.INPUT_VALUE &&
-        orphanBlock.outputConnection.checkType_(thisConnection)) {
+        orphanBlock.outputConnection.checkType(thisConnection)) {
       if (connection) {
         return null;  // More than one connection.
       }
@@ -579,15 +577,14 @@ Blockly.Connection.singleConnection_ = function(block, orphanBlock) {
  * @param {!Blockly.Block} startBlock The block on which to start the search.
  * @param {!Blockly.Block} orphanBlock The block that is looking for a home.
  * @return {Blockly.Connection} The suitable connection point on the chain
- *    of blocks, or null.
- * @private
+ *     of blocks, or null.
+ * @package
  */
-Blockly.Connection.lastConnectionInRow_ = function(startBlock, orphanBlock) {
+Blockly.Connection.lastConnectionInRow = function(startBlock, orphanBlock) {
   var newBlock = startBlock;
   var connection;
-  while (connection = Blockly.Connection.singleConnection_(
-      /** @type {!Blockly.Block} */ (newBlock), orphanBlock)) {
-    // '=' is intentional in line above.
+  while ((connection = Blockly.Connection.singleConnection_(
+      /** @type {!Blockly.Block} */ (newBlock), orphanBlock))) {
     newBlock = connection.targetBlock();
     if (!newBlock || newBlock.isShadow()) {
       return connection;
@@ -601,10 +598,12 @@ Blockly.Connection.lastConnectionInRow_ = function(startBlock, orphanBlock) {
  */
 Blockly.Connection.prototype.disconnect = function() {
   var otherConnection = this.targetConnection;
-  goog.asserts.assert(otherConnection, 'Source connection not connected.');
-  goog.asserts.assert(otherConnection.targetConnection == this,
-      'Target connection not connected to source connection.');
-
+  if (!otherConnection) {
+    throw Error('Source connection not connected.');
+  }
+  if (otherConnection.targetConnection != this) {
+    throw Error('Target connection not connected to source connection.');
+  }
   var parentBlock, childBlock, parentConnection;
   if (this.isSuperior()) {
     // Superior block.
@@ -617,8 +616,16 @@ Blockly.Connection.prototype.disconnect = function() {
     childBlock = this.sourceBlock_;
     parentConnection = otherConnection;
   }
+
+  var eventGroup = Blockly.Events.getGroup();
+  if (!eventGroup) {
+    Blockly.Events.setGroup(true);
+  }
   this.disconnectInternal_(parentBlock, childBlock);
   parentConnection.respawnShadow_();
+  if (!eventGroup) {
+    Blockly.Events.setGroup(false);
+  }
 };
 
 /**
@@ -658,7 +665,7 @@ Blockly.Connection.prototype.respawnShadow_ = function() {
     } else if (blockShadow.previousConnection) {
       this.connect(blockShadow.previousConnection);
     } else {
-      throw 'Child block does not have output or previous statement.';
+      throw Error('Child block does not have output or previous statement.');
     }
   }
 };
@@ -679,9 +686,8 @@ Blockly.Connection.prototype.targetBlock = function() {
  * value type system.  E.g. square_root("Hello") is not compatible.
  * @param {!Blockly.Connection} otherConnection Connection to compare against.
  * @return {boolean} True if the connections share a type.
- * @protected
  */
-Blockly.Connection.prototype.checkType_ = function(otherConnection) {
+Blockly.Connection.prototype.checkType = function(otherConnection) {
   if (!this.check_ || !otherConnection.check_) {
     // One or both sides are promiscuous enough that anything will fit.
     return true;
@@ -697,12 +703,27 @@ Blockly.Connection.prototype.checkType_ = function(otherConnection) {
 };
 
 /**
- * Function to be called when this connection's compatible types have changed.
+ * Is this connection compatible with another connection with respect to the
+ * value type system.  E.g. square_root("Hello") is not compatible.
+ * @param {!Blockly.Connection} otherConnection Connection to compare against.
+ * @return {boolean} True if the connections share a type.
  * @private
+ * @deprecated October 2019, use connection.checkType instead.
+ */
+Blockly.Connection.prototype.checkType_ = function(otherConnection) {
+  console.warn('Deprecated call to Blockly.Connection.prototype.checkType_, ' +
+  'use Blockly.Connection.prototype.checkType instead.');
+  return this.checkType(otherConnection);
+};
+
+/**
+ * Function to be called when this connection's compatible types have changed.
+ * @protected
  */
 Blockly.Connection.prototype.onCheckChanged_ = function() {
   // The new value type may not be compatible with the existing connection.
-  if (this.isConnected() && !this.checkType_(this.targetConnection)) {
+  if (this.isConnected() && (!this.targetConnection ||
+      !this.checkType(this.targetConnection))) {
     var child = this.isSuperior() ? this.targetBlock() : this.sourceBlock_;
     child.unplug();
   }
@@ -710,15 +731,15 @@ Blockly.Connection.prototype.onCheckChanged_ = function() {
 
 /**
  * Change a connection's compatibility.
- * @param {*} check Compatible value type or list of value types.
- *     Null if all types are compatible.
+ * @param {?(string|!Array<string>)} check Compatible value type or list of
+ *     value types. Null if all types are compatible.
  * @return {!Blockly.Connection} The connection being modified
  *     (to allow chaining).
  */
 Blockly.Connection.prototype.setCheck = function(check) {
   if (check) {
     // Ensure that check is in an array.
-    if (!goog.isArray(check)) {
+    if (!Array.isArray(check)) {
       check = [check];
     }
     this.check_ = check;
@@ -727,6 +748,16 @@ Blockly.Connection.prototype.setCheck = function(check) {
     this.check_ = null;
   }
   return this;
+};
+
+/**
+ * Get a connection's compatibility.
+ * @return {Array} List of compatible value types.
+ *     Null if all types are compatible.
+ * @public
+ */
+Blockly.Connection.prototype.getCheck = function() {
+  return this.check_;
 };
 
 /**
@@ -758,7 +789,7 @@ Blockly.Connection.prototype.setShadowDom = function(shadow) {
 
 /**
  * Return a connection's shadow block.
- * @return {Element} shadow DOM representation of a block or null.
+ * @return {Element} Shadow DOM representation of a block or null.
  */
 Blockly.Connection.prototype.getShadowDom = function() {
   return this.shadowDom_;
@@ -772,12 +803,31 @@ Blockly.Connection.prototype.getShadowDom = function() {
  * and always return an empty list (the default).
  * {@link Blockly.RenderedConnection} overrides this behavior with a list
  * computed from the rendered positioning.
- * @param {number} maxLimit The maximum radius to another connection.
+ * @param {number} _maxLimit The maximum radius to another connection.
  * @return {!Array.<!Blockly.Connection>} List of connections.
- * @private
+ * @package
  */
-Blockly.Connection.prototype.neighbours_ = function(/* maxLimit */) {
+Blockly.Connection.prototype.neighbours = function(_maxLimit) {
   return [];
+};
+
+/**
+ * Get the parent input of a connection.
+ * @return {Blockly.Input} The input that the connection belongs to or null if
+ *     no parent exists.
+ * @package
+ */
+Blockly.Connection.prototype.getParentInput = function() {
+  var parentInput = null;
+  var block = this.sourceBlock_;
+  var inputs = block.inputList;
+  for (var idx = 0; idx < block.inputList.length; idx++) {
+    if (inputs[idx].connection === this) {
+      parentInput = inputs[idx];
+      break;
+    }
+  }
+  return parentInput;
 };
 
 /**
@@ -797,9 +847,13 @@ Blockly.Connection.prototype.toString = function() {
   } else if (block.nextConnection == this) {
     msg = 'Next Connection of ';
   } else {
-    var parentInput = goog.array.find(block.inputList, function(input) {
-      return input.connection == this;
-    }, this);
+    var parentInput = null;
+    for (var i = 0, input; (input = block.inputList[i]); i++) {
+      if (input.connection == this) {
+        parentInput = input;
+        break;
+      }
+    }
     if (parentInput) {
       msg = 'Input "' + parentInput.name + '" connection on ';
     } else {

@@ -1,9 +1,6 @@
 /**
  * @license
- * Visual Blocks Editor
- *
- * Copyright 2016 Google Inc.
- * https://developers.google.com/blockly/
+ * Copyright 2016 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +23,17 @@
 
 goog.provide('Blockly.constants');
 
+/**
+ * The multiplier for scroll wheel deltas using the line delta mode.
+ * @type {number}
+ */
+Blockly.LINE_MODE_MULTIPLIER = 40;
+
+/**
+ * The multiplier for scroll wheel deltas using the page delta mode.
+ * @type {number}
+ */
+Blockly.PAGE_MODE_MULTIPLIER = 125;
 
 /**
  * Number of pixels the mouse must move before a drag starts.
@@ -51,6 +59,11 @@ Blockly.SNAP_RADIUS = 48;
 Blockly.CONNECTING_SNAP_RADIUS = 96;
 
 /**
+ * pxt-blockly Radius of circle that highlights connection points when dragging blocks.
+ */
+Blockly.CONNECTION_INDICATOR_RADIUS = 9;
+
+/**
  * How much to prefer staying connected to the current connection over moving to
  * a new connection.  The current previewed connection is considered to be this
  * much closer to the matching connection on the block than it actually is.
@@ -61,6 +74,11 @@ Blockly.CURRENT_CONNECTION_PREFERENCE = 20;
  * Delay in ms between trigger and bumping unconnected block out of alignment.
  */
 Blockly.BUMP_DELAY = 0;
+
+/**
+ * Maximum randomness in workspace units for bumping a block.
+ */
+Blockly.BUMP_RANDOMNESS = 10;
 
 /**
  * Number of characters to truncate a collapsed block to.
@@ -106,18 +124,6 @@ Blockly.SPRITE = {
 };
 
 // Constants below this point are not intended to be changed.
-
-/**
- * Required name space for SVG elements.
- * @const
- */
-Blockly.SVG_NS = 'http://www.w3.org/2000/svg';
-
-/**
- * Required name space for HTML elements.
- * @const
- */
-Blockly.HTML_NS = 'http://www.w3.org/1999/xhtml';
 
 /**
  * ENUM for a right-facing value input.  E.g. 'set item to' or 'return'.
@@ -265,14 +271,14 @@ Blockly.DELETE_AREA_TRASH = 1;
 Blockly.DELETE_AREA_TOOLBOX = 2;
 
 /**
- * String for use in the "custom" attribute of a category in toolbox xml.
+ * String for use in the "custom" attribute of a category in toolbox XML.
  * This string indicates that the category should be dynamically populated with
  * variable blocks.
  * @const {string}
  */
 Blockly.VARIABLE_CATEGORY_NAME = 'VARIABLE';
 /**
- * String for use in the "custom" attribute of a category in toolbox xml.
+ * String for use in the "custom" attribute of a category in toolbox XML.
  * This string indicates that the category should be dynamically populated with
  * variable blocks.
  * @const {string}
@@ -280,12 +286,20 @@ Blockly.VARIABLE_CATEGORY_NAME = 'VARIABLE';
 Blockly.VARIABLE_DYNAMIC_CATEGORY_NAME = 'VARIABLE_DYNAMIC';
 
 /**
- * String for use in the "custom" attribute of a category in toolbox xml.
+ * String for use in the "custom" attribute of a category in toolbox XML.
  * This string indicates that the category should be dynamically populated with
  * procedure blocks.
  * @const {string}
  */
 Blockly.PROCEDURE_CATEGORY_NAME = 'PROCEDURE';
+
+/**
+ * String for use in the dropdown created in field_variable.
+ * This string indicates that this option in the dropdown is 'Create
+ * a variable...' and if selected, should trigger the prompt to create a variable.
+ * @const {string}
+ */
+Blockly.CREATE_VARIABLE_ID = 'CREATE_VARIABLE';
 
 /**
  * String for use in the dropdown created in field_variable.
@@ -302,3 +316,27 @@ Blockly.RENAME_VARIABLE_ID = 'RENAME_VARIABLE_ID';
  * @const {string}
  */
 Blockly.DELETE_VARIABLE_ID = 'DELETE_VARIABLE_ID';
+
+/**
+ * The type of all procedure definition blocks.
+ * @const {string}
+ */
+Blockly.FUNCTION_DEFINITION_BLOCK_TYPE = 'function_definition';
+
+/**
+ * The type of all procedure declaration blocks.
+ * @const {string}
+ */
+Blockly.FUNCTION_DECLARATION_BLOCK_TYPE = 'function_declaration';
+
+/**
+ * The type of all procedure call blocks.
+ * @const {string}
+ */
+Blockly.FUNCTION_CALL_BLOCK_TYPE = 'function_call';
+
+/**
+ * The type of all procedure call blocks with return values.
+ * @const {string}
+ */
+Blockly.FUNCTION_CALL_OUTPUT_BLOCK_TYPE = 'function_call_output';

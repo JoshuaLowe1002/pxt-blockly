@@ -1,9 +1,6 @@
 /**
  * @license
- * Visual Blocks Editor
- *
- * Copyright 2018 Google Inc.
- * https://developers.google.com/blockly/
+ * Copyright 2018 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,33 +25,33 @@ goog.provide('Blockly.Events.Ui');
 
 goog.require('Blockly.Events');
 goog.require('Blockly.Events.Abstract');
+goog.require('Blockly.utils.object');
 
-goog.require('goog.array');
-goog.require('goog.math.Coordinate');
 
 /**
  * Class for a UI event.
+ * UI events are events that don't need to be sent over the wire for multi-user
+ * editing to work (e.g. scrolling the workspace, zooming, opening toolbox
+ * categories).
+ * UI events do not undo or redo.
  * @param {Blockly.Block} block The affected block.
- * @param {string} element One of 'selected', 'comment', 'mutator', etc.
+ * @param {string} element One of 'selected', 'comment', 'mutatorOpen', 'breakpoint' etc.
  * @param {*} oldValue Previous value of element.
  * @param {*} newValue New value of element.
  * @extends {Blockly.Events.Abstract}
  * @constructor
  */
 Blockly.Events.Ui = function(block, element, oldValue, newValue) {
-  if (!block) {
-    return;  // Blank event to be populated by fromJson.
-  }
-
   Blockly.Events.Ui.superClass_.constructor.call(this);
-  this.blockId = block.id;
-  this.workspaceId = block.workspace.id;
+  this.blockId = block ? block.id : null;
+  this.workspaceId = block && block.workspace ? block.workspace.id : undefined;
   this.element = element;
   this.oldValue = oldValue;
   this.newValue = newValue;
+  // UI events do not undo or redo.
   this.recordUndo = false;
 };
-goog.inherits(Blockly.Events.Ui, Blockly.Events.Abstract);
+Blockly.utils.object.inherits(Blockly.Events.Ui, Blockly.Events.Abstract);
 
 /**
  * Type of this event.

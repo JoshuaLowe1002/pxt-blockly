@@ -1,9 +1,6 @@
 /**
  * @license
- * Visual Blocks Editor
- *
- * Copyright 2013 Google Inc.
- * https://developers.google.com/blockly/
+ * Copyright 2013 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,20 +26,11 @@
 /**
  * @name Blockly.WidgetDiv
  * @namespace
- **/
+ */
 goog.provide('Blockly.WidgetDiv');
 
-goog.require('Blockly.Css');
-goog.require('goog.dom');
-goog.require('goog.dom.TagName');
-goog.require('goog.style');
+goog.require('Blockly.utils.style');
 
-
-/**
- * The HTML container.  Set once by Blockly.WidgetDiv.createDom.
- * @type {Element}
- */
-Blockly.WidgetDiv.DIV = null;
 
 /**
  * The object currently using this container.
@@ -53,35 +41,24 @@ Blockly.WidgetDiv.owner_ = null;
 
 /**
  * Optional cleanup function set by whichever object uses the widget.
- * This is called as soon as a dispose is desired. If the dispose should
- * be animated, the animation should start on the call of dispose_.
  * @type {Function}
  * @private
  */
 Blockly.WidgetDiv.dispose_ = null;
 
 /**
- * Optional function called at the end of a dispose animation.
- * Set by whichever object is using the widget.
- * @type {Function}
+ * A class name representing the current owner's workspace renderer.
+ * @type {?string}
  * @private
  */
-Blockly.WidgetDiv.disposeAnimationFinished_ = null;
+Blockly.WidgetDiv.rendererClassName_ = null;
 
 /**
- * Timer ID for the dispose animation.
- * @type {number}
+ * A class name representing the current owner's workspace theme.
+ * @type {?string}
  * @private
  */
-Blockly.WidgetDiv.disposeAnimationTimer_ = null;
-
-/**
- * Length of time in seconds for the dispose animation.
- * @type {number}
- * @private
- */
-Blockly.WidgetDiv.disposeAnimationTimerLength_ = 0;
-
+Blockly.WidgetDiv.themeClassName_ = null;
 
 /**
  * Create the widget div and inject it onto the page.
@@ -90,9 +67,12 @@ Blockly.WidgetDiv.createDom = function() {
   if (Blockly.WidgetDiv.DIV) {
     return;  // Already created.
   }
-  // Create an HTML container for popup overlays (e.g. editor widgets).
-  Blockly.WidgetDiv.DIV =
-      goog.dom.createDom(goog.dom.TagName.DIV, 'blocklyWidgetDiv');
+  /**
+   * The HTML container for popup overlays (e.g. editor widgets).
+   * @type {!Element}
+   */
+  Blockly.WidgetDiv.DIV = document.createElement('div');
+  Blockly.WidgetDiv.DIV.className = 'blocklyWidgetDiv';
   document.body.appendChild(Blockly.WidgetDiv.DIV);
 };
 
@@ -100,75 +80,71 @@ Blockly.WidgetDiv.createDom = function() {
  * Initialize and display the widget div.  Close the old one if needed.
  * @param {!Object} newOwner The object that will be using this container.
  * @param {boolean} rtl Right-to-left (true) or left-to-right (false).
- * @param {Function=} opt_dispose Optional cleanup function to be run when the widget
- *   is closed. If the dispose is animated, this function must start the animation.
- * @param {Function=} opt_disposeAnimationFinished Optional cleanup function to be run
- *   when the widget is done animating and must disappear.
- * @param {number=} opt_disposeAnimationTimerLength Length of animation time in seconds
-     if a dispose animation is provided.
+ * @param {Function} dispose Optional cleanup function to be run when the
+ *     widget is closed.
  */
-Blockly.WidgetDiv.show = function(newOwner, rtl, opt_dispose,
-    opt_disposeAnimationFinished, opt_disposeAnimationTimerLength) {
+Blockly.WidgetDiv.show = function(newOwner, rtl, dispose) {
   Blockly.WidgetDiv.hide();
   Blockly.WidgetDiv.owner_ = newOwner;
-  Blockly.WidgetDiv.dispose_ = opt_dispose;
-  Blockly.WidgetDiv.disposeAnimationFinished_ = opt_disposeAnimationFinished;
-  Blockly.WidgetDiv.disposeAnimationTimerLength_ = opt_disposeAnimationTimerLength;
-  // Temporarily move the widget to the top of the screen so that it does not
-  // cause a scrollbar jump in Firefox when displayed.
-  var xy = goog.style.getViewportPageOffset(document);
-  Blockly.WidgetDiv.DIV.style.top = xy.y + 'px';
-  Blockly.WidgetDiv.DIV.style.direction = rtl ? 'rtl' : 'ltr';
-  Blockly.WidgetDiv.DIV.style.display = 'block';
+  Blockly.WidgetDiv.dispose_ = dispose;
+  var div = Blockly.WidgetDiv.DIV;
+  div.style.direction = rtl ? 'rtl' : 'ltr';
+  div.style.display = 'block';
+  Blockly.WidgetDiv.rendererClassName_ =
+      Blockly.getMainWorkspace().getRenderer().name + '-renderer';
+  Blockly.WidgetDiv.themeClassName_ =
+      Blockly.getMainWorkspace().getTheme().name + '-theme';
+  Blockly.utils.dom.addClass(div, Blockly.WidgetDiv.rendererClassName_);
+  Blockly.utils.dom.addClass(div, Blockly.WidgetDiv.themeClassName_);
 };
 
 /**
- * Destroy the widget and hide the div.
- * @param {boolean=} opt_noAnimate If set, animation will not be run for the hide.
+ *  Repositions the widgetDiv on window resize. If it doesn't know how to
+ *  calculate the new position, it wll just hide it instead.
  */
-Blockly.WidgetDiv.hide = function(opt_noAnimate) {
-  if (Blockly.WidgetDiv.disposeAnimationTimer_) {
-    // An animation timer is set already.
-    // This happens when a previous widget was animating out,
-    // but Blockly is hiding the widget to create a new one.
-    // So, short-circuit the animation and clear the timer.
-    window.clearTimeout(Blockly.WidgetDiv.disposeAnimationTimer_);
-    Blockly.WidgetDiv.disposeAnimationFinished_ && Blockly.WidgetDiv.disposeAnimationFinished_();
-    Blockly.WidgetDiv.disposeAnimationFinished_ = null;
-    Blockly.WidgetDiv.disposeAnimationTimer_ = null;
-    Blockly.WidgetDiv.owner_ = null;
-    Blockly.WidgetDiv.hideAndClearDom_();
-  } else if (Blockly.WidgetDiv.isVisible()) {
-    // No animation timer set, but the widget is visible
-    // Start animation out (or immediately hide)
-    Blockly.WidgetDiv.dispose_ && Blockly.WidgetDiv.dispose_();
-    Blockly.WidgetDiv.dispose_ = null;
-    // If we want to animate out, set the appropriate timer for final dispose.
-    if (Blockly.WidgetDiv.disposeAnimationFinished_ && !opt_noAnimate) {
-      Blockly.WidgetDiv.disposeAnimationTimer_ = window.setTimeout(
-        Blockly.WidgetDiv.hide, // Come back to hide and take the first branch.
-        Blockly.WidgetDiv.disposeAnimationTimerLength_ * 1000
-      );
-    } else {
-      // No timer provided (or no animation desired) - auto-hide the DOM now.
-      Blockly.WidgetDiv.disposeAnimationFinished_ && Blockly.WidgetDiv.disposeAnimationFinished_();
-      Blockly.WidgetDiv.disposeAnimationFinished_ = null;
-      Blockly.WidgetDiv.owner_ = null;
-      Blockly.WidgetDiv.hideAndClearDom_();
-    }
+Blockly.WidgetDiv.repositionForWindowResize = function() {
+  // This condition mainly catches the widget div when it is being used as a
+  // text input.  It is important not to close it in this case because on Android,
+  // when a field is focused, the soft keyboard opens triggering a window resize
+  // event and we want the widget div to stick around so users can type into it.
+  if (Blockly.WidgetDiv.owner_
+      && Blockly.WidgetDiv.owner_.getScaledBBox
+      && Blockly.WidgetDiv.isDisplayed()) {
+    var widgetScaledBBox = Blockly.WidgetDiv.owner_.getScaledBBox();
+    Blockly.WidgetDiv.DIV.style.left = widgetScaledBBox.left + 'px';
+    Blockly.WidgetDiv.DIV.style.top = widgetScaledBBox.top + 'px';
+  } else {
+    Blockly.WidgetDiv.hide();
   }
 };
 
 /**
- * Hide all DOM for the WidgetDiv, and clear its children.
- * @private
+ * Destroy the widget and hide the div.
  */
-Blockly.WidgetDiv.hideAndClearDom_ = function() {
-  Blockly.WidgetDiv.DIV.style.display = 'none';
-  Blockly.WidgetDiv.DIV.style.left = '';
-  Blockly.WidgetDiv.DIV.style.top = '';
-  Blockly.WidgetDiv.DIV.style.height = '';
-  goog.dom.removeChildren(Blockly.WidgetDiv.DIV);
+Blockly.WidgetDiv.hide = function() {
+  var div = Blockly.WidgetDiv.DIV;
+  if (Blockly.WidgetDiv.owner_) {
+    Blockly.WidgetDiv.owner_ = null;
+    div.style.display = 'none';
+    div.style.left = '';
+    div.style.top = '';
+    Blockly.WidgetDiv.dispose_ && Blockly.WidgetDiv.dispose_();
+    Blockly.WidgetDiv.dispose_ = null;
+    div.innerHTML = '';
+
+    var ws = Blockly.getMainWorkspace();
+    if (ws) {
+      ws.markFocused();
+    }
+  }
+  if (Blockly.WidgetDiv.rendererClassName_) {
+    Blockly.utils.dom.removeClass(div, Blockly.WidgetDiv.rendererClassName_);
+    Blockly.WidgetDiv.rendererClassName_ = null;
+  }
+  if (Blockly.WidgetDiv.themeClassName_) {
+    Blockly.utils.dom.removeClass(div, Blockly.WidgetDiv.themeClassName_);
+    Blockly.WidgetDiv.themeClassName_ = null;
+  }
 };
 
 /**
@@ -180,43 +156,22 @@ Blockly.WidgetDiv.isVisible = function() {
 };
 
 /**
+ * pxt-blockly Is the container displayed?
+ * @return {boolean} True if container is displayed on screen.
+ */
+Blockly.WidgetDiv.isDisplayed = function() {
+  return Blockly.WidgetDiv.DIV.style.display != 'none';
+};
+
+/**
  * Destroy the widget and hide the div if it is being used by the specified
- *   object.
+ * object.
  * @param {!Object} oldOwner The object that was using this container.
  */
 Blockly.WidgetDiv.hideIfOwner = function(oldOwner) {
   if (Blockly.WidgetDiv.owner_ == oldOwner) {
     Blockly.WidgetDiv.hide();
   }
-};
-
-/**
- * Position the widget at a given location.  Prevent the widget from going
- * offscreen top or left (right in RTL).
- * @param {number} anchorX Horizontal location (window coordinates, not body).
- * @param {number} anchorY Vertical location (window coordinates, not body).
- * @param {!goog.math.Size} windowSize Height/width of window.
- * @param {!goog.math.Coordinate} scrollOffset X/y of window scrollbars.
- * @param {boolean} rtl True if RTL, false if LTR.
- */
-Blockly.WidgetDiv.position = function(anchorX, anchorY, windowSize,
-    scrollOffset, rtl) {
-  // Don't let the widget go above the top edge of the window.
-  if (anchorY < scrollOffset.y) {
-    anchorY = scrollOffset.y;
-  }
-  if (rtl) {
-    // Don't let the widget go right of the right edge of the window.
-    if (anchorX > windowSize.width + scrollOffset.x) {
-      anchorX = windowSize.width + scrollOffset.x;
-    }
-  } else {
-    // Don't let the widget go left of the left edge of the window.
-    if (anchorX < scrollOffset.x) {
-      anchorX = scrollOffset.x;
-    }
-  }
-  Blockly.WidgetDiv.positionInternal_(anchorX, anchorY, windowSize.height);
 };
 
 /**
@@ -237,12 +192,12 @@ Blockly.WidgetDiv.positionInternal_ = function(x, y, height) {
  * Position the widget div based on an anchor rectangle.
  * The widget should be placed adjacent to but not overlapping the anchor
  * rectangle.  The preferred position is directly below and aligned to the left
- * (ltr) or right (rtl) side of the anchor.
+ * (LTR) or right (RTL) side of the anchor.
  * @param {!Object} viewportBBox The bounding rectangle of the current viewport,
  *     in window coordinates.
  * @param {!Object} anchorBBox The bounding rectangle of the anchor, in window
  *     coordinates.
- * @param {!goog.math.Size} widgetSize The size of the widget that is inside the
+ * @param {!Blockly.utils.Size} widgetSize The size of the widget that is inside the
  *     widget div, in window coordinates.
  * @param {boolean} rtl Whether the workspace is in RTL mode.  This determines
  *     horizontal alignment.
@@ -254,7 +209,11 @@ Blockly.WidgetDiv.positionWithAnchor = function(viewportBBox, anchorBBox,
   var x = Blockly.WidgetDiv.calculateX_(viewportBBox, anchorBBox, widgetSize,
       rtl);
 
-  Blockly.WidgetDiv.positionInternal_(x, y, widgetSize.height);
+  if (y < 0) {
+    Blockly.WidgetDiv.positionInternal_(x, 0, widgetSize.height + y);
+  } else {
+    Blockly.WidgetDiv.positionInternal_(x, y, widgetSize.height);
+  }
 };
 
 /**
@@ -264,7 +223,7 @@ Blockly.WidgetDiv.positionWithAnchor = function(viewportBBox, anchorBBox,
  *     in window coordinates.
  * @param {!Object} anchorBBox The bounding rectangle of the anchor, in window
  *     coordinates.
- * @param {goog.math.Size} widgetSize The dimensions of the widget inside the
+ * @param {Blockly.utils.Size} widgetSize The dimensions of the widget inside the
  *     widget div.
  * @param {boolean} rtl Whether the Blockly workspace is in RTL mode.
  * @return {number} A valid x-coordinate for the top left corner of the widget
@@ -274,17 +233,16 @@ Blockly.WidgetDiv.positionWithAnchor = function(viewportBBox, anchorBBox,
 Blockly.WidgetDiv.calculateX_ = function(viewportBBox, anchorBBox, widgetSize,
     rtl) {
   if (rtl) {
-    // Try to align the right side of the field and the right side of the widget.
+    // Try to align the right side of the field and the right side of widget.
     var widgetLeft = anchorBBox.right - widgetSize.width;
     // Don't go offscreen left.
     var x = Math.max(widgetLeft, viewportBBox.left);
     // But really don't go offscreen right:
     return Math.min(x, viewportBBox.right - widgetSize.width);
   } else {
-    // Try to align the left side of the field and the left side of the widget.
+    // Try to align the left side of the field and the left side of widget.
     // Don't go offscreen right.
-    var x = Math.min(anchorBBox.left,
-        viewportBBox.right - widgetSize.width);
+    var x = Math.min(anchorBBox.left, viewportBBox.right - widgetSize.width);
     // But left is more important, because that's where the text is.
     return Math.max(x, viewportBBox.left);
   }
@@ -297,7 +255,7 @@ Blockly.WidgetDiv.calculateX_ = function(viewportBBox, anchorBBox, widgetSize,
  *     in window coordinates.
  * @param {!Object} anchorBBox The bounding rectangle of the anchor, in window
  *     coordinates.
- * @param {goog.math.Size} widgetSize The dimensions of the widget inside the
+ * @param {Blockly.utils.Size} widgetSize The dimensions of the widget inside the
  *     widget div.
  * @return {number} A valid y-coordinate for the top left corner of the widget
  *     div, in window coordinates.
@@ -305,12 +263,7 @@ Blockly.WidgetDiv.calculateX_ = function(viewportBBox, anchorBBox, widgetSize,
  */
 Blockly.WidgetDiv.calculateY_ = function(viewportBBox, anchorBBox, widgetSize) {
   // Flip the widget vertically if off the bottom.
-  if (anchorBBox.bottom + widgetSize.height >=
-      viewportBBox.bottom) {
-    if (anchorBBox.bottom - widgetSize.height <= viewportBBox.top) {
-      // The top of the widget is at the top of the viewport.
-      return viewportBBox.top;
-    }
+  if (anchorBBox.bottom + widgetSize.height >= viewportBBox.bottom) {
     // The bottom of the widget is at the top of the field.
     return anchorBBox.top - widgetSize.height;
     // The widget could go off the top of the window, but it would also go off

@@ -1,9 +1,6 @@
 /**
  * @license
- * Visual Blocks Editor
- *
- * Copyright 2012 Google Inc.
- * https://developers.google.com/blockly/
+ * Copyright 2012 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +25,6 @@ goog.provide('Blockly.Input');
 
 goog.require('Blockly.Connection');
 goog.require('Blockly.FieldLabel');
-goog.require('goog.asserts');
 
 
 /**
@@ -42,7 +38,7 @@ goog.require('goog.asserts');
  */
 Blockly.Input = function(type, name, block, connection) {
   if (type != Blockly.DUMMY_INPUT && !name) {
-    throw 'Value inputs and statement inputs must have non-empty name.';
+    throw Error('Value inputs and statement inputs must have non-empty name.');
   }
   /** @type {number} */
   this.type = type;
@@ -57,13 +53,6 @@ Blockly.Input = function(type, name, block, connection) {
   this.connection = connection;
   /** @type {!Array.<!Blockly.Field>} */
   this.fieldRow = [];
-
-  /**
-   * The shape that is displayed when this input is rendered but not filled.
-   * @type {SVGElement}
-   * @package
-   */
-  this.outlinePath = null;
 };
 
 /**
@@ -78,6 +67,14 @@ Blockly.Input.prototype.align = Blockly.ALIGN_LEFT;
  * @private
  */
 Blockly.Input.prototype.visible_ = true;
+
+/**
+ * Get the source block for this input.
+ * @return {Blockly.Block} The source block, or null if there is none.
+ */
+Blockly.Input.prototype.getSourceBlock = function() {
+  return this.sourceBlock_;
+};
 
 /**
  * Add a field (or label from string), and all prefix and suffix fields, to the
@@ -103,15 +100,16 @@ Blockly.Input.prototype.appendField = function(field, opt_name) {
  */
 Blockly.Input.prototype.insertFieldAt = function(index, field, opt_name) {
   if (index < 0 || index > this.fieldRow.length) {
-    throw new Error('index ' + index + ' out of bounds.');
+    throw Error('index ' + index + ' out of bounds.');
   }
 
-  // Empty string, Null or undefined generates no field, unless field is named.
-  if (!field && !opt_name) {
+  // Falsy field values don't generate a field, unless the field is an empty
+  // string and named.
+  if (!field && !(field == '' && opt_name)) {
     return index;
   }
   // Generate a FieldLabel when given a plain text field.
-  if (goog.isString(field)) {
+  if (typeof field == 'string') {
     field = new Blockly.FieldLabel(/** @type {string} */ (field));
   }
   field.setSourceBlock(this.sourceBlock_);
@@ -135,7 +133,7 @@ Blockly.Input.prototype.insertFieldAt = function(index, field, opt_name) {
   if (this.sourceBlock_.rendered) {
     this.sourceBlock_.render();
     // Adding a field will cause the block to change shape.
-    this.sourceBlock_.bumpNeighbours_();
+    this.sourceBlock_.bumpNeighbours();
   }
   return index;
 };
@@ -143,22 +141,22 @@ Blockly.Input.prototype.insertFieldAt = function(index, field, opt_name) {
 /**
  * Remove a field from this input.
  * @param {string} name The name of the field.
- * @throws {goog.asserts.AssertionError} if the field is not present.
+ * @throws {Error} if the field is not present.
  */
 Blockly.Input.prototype.removeField = function(name) {
-  for (var i = 0, field; field = this.fieldRow[i]; i++) {
+  for (var i = 0, field; (field = this.fieldRow[i]); i++) {
     if (field.name === name) {
       field.dispose();
       this.fieldRow.splice(i, 1);
       if (this.sourceBlock_.rendered) {
         this.sourceBlock_.render();
         // Removing a field will cause the block to change shape.
-        this.sourceBlock_.bumpNeighbours_();
+        this.sourceBlock_.bumpNeighbours();
       }
       return;
     }
   }
-  goog.asserts.fail('Field "%s" not found.', name);
+  throw Error('Field "%s" not found.', name);
 };
 
 /**
@@ -171,34 +169,31 @@ Blockly.Input.prototype.isVisible = function() {
 
 /**
  * Sets whether this input is visible or not.
- * Used to collapse/uncollapse a block.
+ * Should only be used to collapse/uncollapse a block.
  * @param {boolean} visible True if visible.
  * @return {!Array.<!Blockly.Block>} List of blocks to render.
+ * @package
  */
 Blockly.Input.prototype.setVisible = function(visible) {
+  // Note: Currently there are only unit tests for block.setCollapsed()
+  // because this function is package. If this function goes back to being a
+  // public API tests (lots of tests) should be added.
   var renderList = [];
   if (this.visible_ == visible) {
     return renderList;
   }
   this.visible_ = visible;
 
-  // pxtblockly: hidden inputs get filtered out of the block's
-  // render list so the input shapes don't get hidden. Hide them
-  // here instead
-  if (!visible && this.outlinePath) {
-    this.outlinePath.setAttribute('style', 'visibility: hidden');
-  }
-
   var display = visible ? 'block' : 'none';
-  for (var y = 0, field; field = this.fieldRow[y]; y++) {
+  for (var y = 0, field; (field = this.fieldRow[y]); y++) {
     field.setVisible(visible);
   }
   if (this.connection) {
     // Has a connection.
     if (visible) {
-      renderList = this.connection.unhideAll();
+      renderList = this.connection.startTrackingAll();
     } else {
-      this.connection.hideAll();
+      this.connection.stopTrackingAll();
     }
     var child = this.connection.targetBlock();
     if (child) {
@@ -212,6 +207,16 @@ Blockly.Input.prototype.setVisible = function(visible) {
 };
 
 /**
+ * Mark all fields on this input as dirty.
+ * @package
+ */
+Blockly.Input.prototype.markDirty = function() {
+  for (var y = 0, field; (field = this.fieldRow[y]); y++) {
+    field.markDirty();
+  }
+};
+
+/**
  * Change a connection's compatibility.
  * @param {string|Array.<string>|null} check Compatible value type or
  *     list of value types.  Null if all types are compatible.
@@ -219,7 +224,7 @@ Blockly.Input.prototype.setVisible = function(visible) {
  */
 Blockly.Input.prototype.setCheck = function(check) {
   if (!this.connection) {
-    throw 'This input does not have a connection.';
+    throw Error('This input does not have a connection.');
   }
   this.connection.setCheck(check);
   return this;
@@ -253,40 +258,14 @@ Blockly.Input.prototype.init = function() {
 
 /**
  * Sever all links to this input.
+ * @suppress {checkTypes}
  */
 Blockly.Input.prototype.dispose = function() {
-  if (this.outlinePath) {
-    goog.dom.removeNode(this.outlinePath);
-  }
-  for (var i = 0, field; field = this.fieldRow[i]; i++) {
+  for (var i = 0, field; (field = this.fieldRow[i]); i++) {
     field.dispose();
   }
   if (this.connection) {
     this.connection.dispose();
   }
   this.sourceBlock_ = null;
-};
-
-/**
- * Create the input shape path element and attach it to the given SVG element.
- * @param {!SVGElement} svgRoot The parent on which ot append the new element.
- * @package
- */
-Blockly.Input.prototype.initOutlinePath = function(svgRoot) {
-  if (!this.sourceBlock_.workspace.rendered) {
-    return;  // Headless blocks don't need field outlines.
-  }
-  if (this.outlinePath) {
-    return;
-  }
-  if (this.type == Blockly.INPUT_VALUE) {
-    this.outlinePath = Blockly.utils.createSvgElement(
-        'path',
-        {
-          'class': 'blocklyPath',
-          'style': 'visibility: hidden', // Hide by default - shown when not connected.
-          'd': ''  // IE doesn't like paths without the data definition, set an empty default
-        },
-        svgRoot);
-  }
 };

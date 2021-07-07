@@ -1,9 +1,6 @@
 /**
  * @license
- * Visual Blocks Editor
- *
- * Copyright 2012 Google Inc.
- * https://developers.google.com/blockly/
+ * Copyright 2012 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,17 +26,22 @@
  */
 'use strict';
 
+goog.provide('Blockly.Blocks.math');  // Deprecated
 goog.provide('Blockly.Constants.Math');
 
+goog.require('Blockly');
 goog.require('Blockly.Blocks');
 goog.require('Blockly.Colours');
 goog.require('Blockly.constants');
-goog.require('Blockly');
+goog.require('Blockly.FieldDropdown');
+goog.require('Blockly.FieldLabel');
+goog.require('Blockly.FieldNumber');
+goog.require('Blockly.FieldVariable');
 
 
 /**
  * Unused constant for the common HSV hue for all blocks in this category.
- * @deprecated Use Blockly.Msg.MATH_HUE. (2018 April 5)
+ * @deprecated Use Blockly.Msg['MATH_HUE']. (2018 April 5)
  */
 Blockly.Constants.Math.HUE = 230;
 
@@ -54,14 +56,13 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
       "value": 0
     }],
     "output": "Number",
-    "colour": Blockly.Colours.textField,
-    "colourSecondary": Blockly.Colours.textField,
-    "colourTertiary": Blockly.Colours.textField,
     "outputShape": Blockly.OUTPUT_SHAPE_ROUND,
+    "style": "field_blocks",
     "helpUrl": "%{BKY_MATH_NUMBER_HELPURL}",
     "tooltip": "%{BKY_MATH_NUMBER_TOOLTIP}",
     "extensions": ["parent_tooltip_when_inline"]
   },
+
   // Block for integer numeric value.
   {
     "type": "math_integer",
@@ -72,14 +73,13 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
       "precision": 1
     }],
     "output": "Number",
-    "colour": Blockly.Colours.textField,
-    "colourSecondary": Blockly.Colours.textField,
-    "colourTertiary": Blockly.Colours.textField,
     "outputShape": Blockly.OUTPUT_SHAPE_ROUND,
+    "style": "field_blocks",
     "helpUrl": "%{BKY_MATH_NUMBER_HELPURL}",
     "tooltip": "%{BKY_MATH_NUMBER_TOOLTIP}",
     "extensions": ["parent_tooltip_when_inline"]
   },
+
   // Block for whole numeric value.
   {
     "type": "math_whole_number",
@@ -91,14 +91,13 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
       "precision": 1
     }],
     "output": "Number",
-    "colour": Blockly.Colours.textField,
-    "colourSecondary": Blockly.Colours.textField,
-    "colourTertiary": Blockly.Colours.textField,
     "outputShape": Blockly.OUTPUT_SHAPE_ROUND,
+    "style": "field_blocks",
     "helpUrl": "%{BKY_MATH_NUMBER_HELPURL}",
     "tooltip": "%{BKY_MATH_NUMBER_TOOLTIP}",
     "extensions": ["parent_tooltip_when_inline"]
   },
+
   // Block for positive numeric value.
   {
     "type": "math_positive_number",
@@ -109,14 +108,13 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
       "min": 0
     }],
     "output": "Number",
-    "colour": Blockly.Colours.textField,
-    "colourSecondary": Blockly.Colours.textField,
-    "colourTertiary": Blockly.Colours.textField,
     "outputShape": Blockly.OUTPUT_SHAPE_ROUND,
+    "style": "field_blocks",
     "helpUrl": "%{BKY_MATH_NUMBER_HELPURL}",
     "tooltip": "%{BKY_MATH_NUMBER_TOOLTIP}",
     "extensions": ["parent_tooltip_when_inline"]
   },
+
   // Block for numeric value with min and max.
   {
     "type": "math_number_minmax",
@@ -129,10 +127,8 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
       "labelText": "Number"
     }],
     "output": "Number",
-    "colour": Blockly.Colours.textField,
-    "colourSecondary": Blockly.Colours.textField,
-    "colourTertiary": Blockly.Colours.textField,
     "outputShape": Blockly.OUTPUT_SHAPE_ROUND,
+    "style": "field_blocks",
     "helpUrl": "%{BKY_MATH_NUMBER_HELPURL}",
     "tooltip": "%{BKY_MATH_NUMBER_TOOLTIP}",
     "mutator": "math_number_minmax_mutator",
@@ -168,8 +164,8 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
     ],
     "inputsInline": true,
     "output": "Number",
-    "colour": "%{BKY_MATH_HUE}",
     "outputShape": Blockly.OUTPUT_SHAPE_ROUND,
+    "style": "math_blocks",
     "helpUrl": "%{BKY_MATH_ARITHMETIC_HELPURL}",
     "extensions": ["math_op_tooltip"]
   },
@@ -199,8 +195,8 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
       }
     ],
     "output": "Number",
-    "colour": "%{BKY_MATH_HUE}",
     "outputShape": Blockly.OUTPUT_SHAPE_ROUND,
+    "style": "math_blocks",
     "helpUrl": "%{BKY_MATH_SINGLE_HELPURL}",
     "extensions": ["math_op_tooltip"]
   },
@@ -229,8 +225,8 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
       }
     ],
     "output": "Number",
-    "colour": "%{BKY_MATH_HUE}",
     "outputShape": Blockly.OUTPUT_SHAPE_ROUND,
+    "style": "math_blocks",
     "helpUrl": "%{BKY_MATH_TRIG_HELPURL}",
     "extensions": ["math_op_tooltip"]
   },
@@ -254,8 +250,8 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
       }
     ],
     "output": "Number",
-    "colour": "%{BKY_MATH_HUE}",
     "outputShape": Blockly.OUTPUT_SHAPE_ROUND,
+    "style": "math_blocks",
     "tooltip": "%{BKY_MATH_CONSTANT_TOOLTIP}",
     "helpUrl": "%{BKY_MATH_CONSTANT_HELPURL}"
   },
@@ -287,8 +283,8 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
     ],
     "inputsInline": true,
     "output": "Boolean",
-    "colour": "%{BKY_MATH_HUE}",
     "outputShape": Blockly.OUTPUT_SHAPE_HEXAGONAL,
+    "style": "math_blocks",
     "tooltip": "%{BKY_MATH_IS_TOOLTIP}",
     "mutator": "math_is_divisibleby_mutator"
   },
@@ -311,7 +307,7 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
     ],
     "previousStatement": null,
     "nextStatement": null,
-    "colour": "%{BKY_VARIABLES_HUE}",
+    "style": "variable_blocks",
     "helpUrl": "%{BKY_MATH_CHANGE_HELPURL}",
     "extensions": ["math_change_tooltip"]
   },
@@ -337,8 +333,8 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
       }
     ],
     "output": "Number",
-    "colour": "%{BKY_MATH_HUE}",
     "outputShape": Blockly.OUTPUT_SHAPE_ROUND,
+    "style": "math_blocks",
     "helpUrl": "%{BKY_MATH_ROUND_HELPURL}",
     "tooltip": "%{BKY_MATH_ROUND_TOOLTIP}"
   },
@@ -370,8 +366,8 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
       }
     ],
     "output": "Number",
-    "colour": "%{BKY_MATH_HUE}",
     "outputShape": Blockly.OUTPUT_SHAPE_ROUND,
+    "style": "math_blocks",
     "helpUrl": "%{BKY_MATH_ONLIST_HELPURL}",
     "mutator": "math_modes_of_list_mutator",
     "extensions": ["math_op_tooltip"]
@@ -395,8 +391,8 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
     ],
     "inputsInline": true,
     "output": "Number",
-    "colour": "%{BKY_MATH_HUE}",
     "outputShape": Blockly.OUTPUT_SHAPE_ROUND,
+    "style": "math_blocks",
     "tooltip": "%{BKY_MATH_MODULO_TOOLTIP}",
     "helpUrl": "%{BKY_MATH_MODULO_HELPURL}"
   },
@@ -424,8 +420,8 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
     ],
     "inputsInline": true,
     "output": "Number",
-    "colour": "%{BKY_MATH_HUE}",
     "outputShape": Blockly.OUTPUT_SHAPE_ROUND,
+    "style": "math_blocks",
     "tooltip": "%{BKY_MATH_CONSTRAIN_TOOLTIP}",
     "helpUrl": "%{BKY_MATH_CONSTRAIN_HELPURL}"
   },
@@ -448,8 +444,8 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
     ],
     "inputsInline": true,
     "output": "Number",
-    "colour": "%{BKY_MATH_HUE}",
     "outputShape": Blockly.OUTPUT_SHAPE_ROUND,
+    "style": "math_blocks",
     "tooltip": "%{BKY_MATH_RANDOM_INT_TOOLTIP}",
     "helpUrl": "%{BKY_MATH_RANDOM_INT_HELPURL}"
   },
@@ -459,10 +455,33 @@ Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
     "type": "math_random_float",
     "message0": "%{BKY_MATH_RANDOM_FLOAT_TITLE_RANDOM}",
     "output": "Number",
-    "colour": "%{BKY_MATH_HUE}",
     "outputShape": Blockly.OUTPUT_SHAPE_ROUND,
+    "style": "math_blocks",
     "tooltip": "%{BKY_MATH_RANDOM_FLOAT_TOOLTIP}",
     "helpUrl": "%{BKY_MATH_RANDOM_FLOAT_HELPURL}"
+  },
+
+  // Block for calculating atan2 of [X] and [Y].
+  {
+    "type": "math_atan2",
+    "message0": "%{BKY_MATH_ATAN2_TITLE}",
+    "args0": [
+      {
+        "type": "input_value",
+        "name": "X",
+        "check": "Number"
+      },
+      {
+        "type": "input_value",
+        "name": "Y",
+        "check": "Number"
+      }
+    ],
+    "inputsInline": true,
+    "output": "Number",
+    "style": "math_blocks",
+    "tooltip": "%{BKY_MATH_ATAN2_TOOLTIP}",
+    "helpUrl": "%{BKY_MATH_ATAN2_HELPURL}"
   }
 ]);  // END JSON EXTRACT (Do not delete this comment.)
 
@@ -525,10 +544,10 @@ Blockly.Constants.Math.IS_DIVISIBLEBY_MUTATOR_MIXIN = {
   /**
    * Create XML to represent whether the 'divisorInput' should be present.
    * @return {Element} XML storage element.
-   * @this Blockly.Block
+   * @this {Blockly.Block}
    */
   mutationToDom: function() {
-    var container = document.createElement('mutation');
+    var container = Blockly.utils.xml.createElement('mutation');
     var divisorInput = (this.getFieldValue('PROPERTY') == 'DIVISIBLE_BY');
     container.setAttribute('divisor_input', divisorInput);
     return container;
@@ -536,7 +555,7 @@ Blockly.Constants.Math.IS_DIVISIBLEBY_MUTATOR_MIXIN = {
   /**
    * Parse XML to restore the 'divisorInput'.
    * @param {!Element} xmlElement XML storage element.
-   * @this Blockly.Block
+   * @this {Blockly.Block}
    */
   domToMutation: function(xmlElement) {
     var divisorInput = (xmlElement.getAttribute('divisor_input') == 'true');
@@ -546,7 +565,7 @@ Blockly.Constants.Math.IS_DIVISIBLEBY_MUTATOR_MIXIN = {
    * Modify this block to have (or not have) an input for 'is divisible by'.
    * @param {boolean} divisorInput True if this block has a divisor input.
    * @private
-   * @this Blockly.Block
+   * @this {Blockly.Block}
    */
   updateShape_: function(divisorInput) {
     // Add or remove a Value Input.
@@ -566,13 +585,13 @@ Blockly.Constants.Math.IS_DIVISIBLEBY_MUTATOR_MIXIN = {
  * 'math_is_divisibleby_mutator' extension to the 'math_property' block that
  * can update the block shape (add/remove divisor input) based on whether
  * property is "divisble by".
- * @this Blockly.Block
+ * @this {Blockly.Block}
  * @package
  */
 Blockly.Constants.Math.IS_DIVISIBLE_MUTATOR_EXTENSION = function() {
   this.getField('PROPERTY').setValidator(function(option) {
     var divisorInput = (option == 'DIVISIBLE_BY');
-    this.sourceBlock_.updateShape_(divisorInput);
+    this.getSourceBlock().updateShape_(divisorInput);
   });
 };
 
@@ -598,7 +617,7 @@ Blockly.Constants.Math.LIST_MODES_MUTATOR_MIXIN = {
    * Modify this block to have the correct output type.
    * @param {string} newOp Either 'MODE' or some op than returns a number.
    * @private
-   * @this Blockly.Block
+   * @this {Blockly.Block}
    */
   updateType_: function(newOp) {
     if (newOp == 'MODE') {
@@ -610,17 +629,17 @@ Blockly.Constants.Math.LIST_MODES_MUTATOR_MIXIN = {
   /**
    * Create XML to represent the output type.
    * @return {Element} XML storage element.
-   * @this Blockly.Block
+   * @this {Blockly.Block}
    */
   mutationToDom: function() {
-    var container = document.createElement('mutation');
+    var container = Blockly.utils.xml.createElement('mutation');
     container.setAttribute('op', this.getFieldValue('OP'));
     return container;
   },
   /**
    * Parse XML to restore the output type.
    * @param {!Element} xmlElement XML storage element.
-   * @this Blockly.Block
+   * @this {Blockly.Block}
    */
   domToMutation: function(xmlElement) {
     this.updateType_(xmlElement.getAttribute('op'));
@@ -630,7 +649,7 @@ Blockly.Constants.Math.LIST_MODES_MUTATOR_MIXIN = {
 /**
  * Extension to 'math_on_list' blocks that allows support of
  * modes operation (outputs a list of numbers).
- * @this Blockly.Block
+ * @this {Blockly.Block}
  * @package
  */
 Blockly.Constants.Math.LIST_MODES_MUTATOR_EXTENSION = function() {
@@ -651,7 +670,7 @@ Blockly.Constants.Math.MATH_NUMBER_MINMAX_MIXIN = {
    * @this Blockly.Block
    */
   mutationToDom: function() {
-    var container = document.createElement('mutation');
+    var container = Blockly.utils.xml.createElement('mutation');
     if (this.inputList[0].fieldRow[0].min_ != undefined) container.setAttribute('min', this.inputList[0].fieldRow[0].min_);
     if (this.inputList[0].fieldRow[0].max_ != undefined) container.setAttribute('max', this.inputList[0].fieldRow[0].max_);
     if (this.inputList[0].fieldRow[0].labelText_ != undefined) container.setAttribute('label', this.inputList[0].fieldRow[0].labelText_);

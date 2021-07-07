@@ -1,4 +1,6 @@
-# OSX
+node_modules
+npm-debug.log
+build-debug.log
 .DS_Store
 
 # NPM
@@ -9,6 +11,7 @@ npm-*
 common.pyc
 .settings
 .project
+*.gz
 *.pyc
 *.komodoproject
 /nbproject/private/
@@ -22,6 +25,7 @@ tests/compile/*compiler*.jar
 /dist
 /msg/json/synonyms.json
 /msg/json/qqq.json
+/gh-pages/main.js
 /gh-pages/playgrounds
 /gh-pages/Gemfile.lock
 /gh-pages/closure-library
@@ -30,5 +34,9 @@ tests/compile/*compiler*.jar
 /chromedriver
 tests/compile/main_compressed.js
 tests/compile/*compiler*.jar
+tests/screenshot/outputs/*
 local_build/*compiler*.jar
-local_build/local_blockly_compressed.js
+local_build/local_*_compressed.js
+chromedriver
+typings/tmp/*
+dist/

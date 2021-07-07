@@ -28,10 +28,11 @@
 goog.provide('Blockly.FieldVariableGetter');
 
 goog.require('Blockly.Field');
+goog.require('Blockly.utils.object');
 
 /**
  * Class for a variable getter field.
- * @param {?string} varname The default name for the variable.  If null,
+ * @param {?string} varName The default name for the variable.  If null,
  *     a unique variable name will be generated.
  * @param {Function=} opt_validator A function that is executed when a new
  *     option is selected.  Its sole argument is the new option value.
@@ -39,20 +40,42 @@ goog.require('Blockly.Field');
  *     to include in the dropdown.
  * @param {string=} opt_defaultType The type of variable to create if this
  *     field's value is not explicitly set.  Defaults to ''.
+ * @param {Object=} opt_config A map of options used to configure the field.
+ *    See the [field creation documentation]{@link https://developers.google.com/blockly/guides/create-custom-blocks/fields/built-in-fields/variable#creation}
+ *    for a list of properties this parameter supports.
  * @extends {Blockly.FieldDropdown}
  * @constructor
+ * 
  */
-Blockly.FieldVariableGetter = function(varname, opt_validator, opt_variableTypes,
-    opt_defaultType) {
-  this.size_ = new goog.math.Size(Blockly.BlockSvg.FIELD_WIDTH,
-      Blockly.BlockSvg.FIELD_HEIGHT);
-  this.setValidator(opt_validator);
-  this.defaultVariableName = (varname || '');
-
-  this.setTypes_(opt_variableTypes, opt_defaultType);
-  this.value_ = null;
+Blockly.FieldVariableGetter = function(varName, opt_validator, opt_variableTypes,
+    opt_defaultType, opt_config) {
+  // The FieldDropdown constructor expects the field's initial value to be
+  // the first entry in the menu generator, which it may or may not be.
+  // Just do the relevant parts of the constructor.
+   /**
+    * The initial variable name passed to this field's constructor, or an
+    * empty string if a name wasn't provided. Used to create the initial
+    * variable.
+    * @type {string}
+    */
+   this.defaultVariableName = varName || '';
+ 
+   /**
+    * The size of the area rendered by the field.
+    * @type {Blockly.utils.Size}
+    * @protected
+    * @override
+    */
+   this.size_ = new Blockly.utils.Size(0, 0);
+ 
+   opt_config && this.configure_(opt_config);
+   opt_validator && this.setValidator(opt_validator);
+ 
+   if (!opt_config) {  // Only do one kind of configuration or the other.
+     this.setTypes_(opt_variableTypes, opt_defaultType);
+   }
 };
-goog.inherits(Blockly.FieldVariableGetter, Blockly.Field);
+Blockly.utils.object.inherits(Blockly.FieldVariableGetter, Blockly.Field);
 
 /**
  * Construct a FieldVariableGetter from a JSON arg object,
@@ -70,6 +93,18 @@ Blockly.FieldVariableGetter.fromJson = function(options) {
   return new Blockly.FieldVariableGetter(varname, null,
       variableTypes, defaultType);
 };
+
+/**
+ * The workspace that this variable field belongs to.
+ * @type {?Blockly.Workspace}
+ * @private
+ */
+Blockly.FieldVariableGetter.prototype.workspace_ = null;
+
+/**
+ * Mouse cursor style when over the hotspot that initiates the editor.
+ */
+Blockly.FieldVariableGetter.prototype.CURSOR = 'copy';
 
 /**
  * Editable fields usually show some sort of UI for the user to change them.
@@ -90,15 +125,16 @@ Blockly.FieldVariableGetter.prototype.SERIALIZABLE = true;
 /**
  * Install this field on a block.
  */
-Blockly.FieldVariableGetter.prototype.init = function() {
-  if (this.fieldGroup_) {
-    // Field has already been initialized once.
-    return;
+Blockly.FieldVariableGetter.prototype.initView = function() {
+  this.createTextElement_();
+  if (this.sourceBlock_.isEditable()) {
+    this.mouseOverWrapper_ =
+        Blockly.bindEvent_(
+            this.getClickTarget_(), 'mouseover', this, this.onMouseOver_);
+    this.mouseOutWrapper_ =
+        Blockly.bindEvent_(
+            this.getClickTarget_(), 'mouseout', this, this.onMouseOut_);
   }
-  Blockly.FieldVariableGetter.superClass_.init.call(this);
-
-  // TODO (blockly #1010): Change from init/initModel to initView/initModel
-  this.initModel();
 };
 
 /**
@@ -106,23 +142,57 @@ Blockly.FieldVariableGetter.prototype.init = function() {
  * If the value has not been set to a variable by the first render, we make up a
  * variable rather than let the value be invalid.
  * @package
-*/
+ */
 Blockly.FieldVariableGetter.prototype.initModel = function() {
   if (this.variable_) {
     return; // Initialization already happened.
   }
-  this.workspace_ = this.sourceBlock_.workspace;
   var variable = Blockly.Variables.getOrCreateVariablePackage(
-      this.workspace_, null, this.defaultVariableName, this.defaultType_);
+      this.sourceBlock_.workspace, null,
+      this.defaultVariableName, this.defaultType_);
 
-  // Don't fire a change event for this setValue.  It would have null as the
-  // old value, which is not valid.
-  Blockly.Events.disable();
-  try {
-    this.setValue(variable.getId());
-  } finally {
-    Blockly.Events.enable();
+  // Don't call setValue because we don't want to cause a rerender.
+  this.doValueUpdate_(variable.getId());
+};
+
+/**
+ * Handle a mouse over event on a input field.
+ * @param {!Event} e Mouse over event.
+ * @private
+ */
+Blockly.FieldVariableGetter.prototype.onMouseOver_ = function(e) {
+  if (this.sourceBlock_.isInFlyout) return;
+  var gesture = this.sourceBlock_.workspace.getGesture(e);
+  if (gesture && gesture.isDragging()) return;
+  var svgPath = this.sourceBlock_.pathObject.svgPath;
+  if (svgPath) {
+    Blockly.utils.dom.addClass(svgPath, 'blocklyFieldHover');
+    svgPath.style.strokeDasharray = '2';
   }
+};
+
+/**
+ * Clear hover effect on the block
+ * @param {!Event} e Clear hover effect
+ */
+Blockly.FieldVariableGetter.prototype.clearHover = function() {
+  var svgPath = this.sourceBlock_.pathObject.svgPath;
+  if (svgPath) {
+    Blockly.utils.dom.removeClass(svgPath, 'blocklyFieldHover');
+    svgPath.style.strokeDasharray = '';
+  }
+};
+
+/**
+ * Handle a mouse out event on a input field.
+ * @param {!Event} e Mouse out event.
+ * @private
+ */
+Blockly.FieldVariableGetter.prototype.onMouseOut_ = function(e) {
+  if (this.sourceBlock_.isInFlyout) return;
+  var gesture = this.sourceBlock_.workspace.getGesture(e);
+  if (gesture && gesture.isDragging()) return;
+  this.clearHover();
 };
 
 /**
@@ -130,9 +200,63 @@ Blockly.FieldVariableGetter.prototype.initModel = function() {
  * @public
  */
 Blockly.FieldVariableGetter.dispose = function() {
+  if (this.mouseOverWrapper_) {
+    Blockly.unbindEvent_(this.mouseOverWrapper_);
+    this.mouseOverWrapper_ = null;
+  }
+  if (this.mouseOutWrapper_) {
+    Blockly.unbindEvent_(this.mouseOutWrapper_);
+    this.mouseOutWrapper_ = null;
+  }
   Blockly.FieldVariableGetter.superClass_.dispose.call(this);
   this.workspace_ = null;
   this.variableMap_ = null;
+};
+
+/**
+ * Initialize this field based on the given XML.
+ * @param {!Element} fieldElement The element containing information about the
+ *    variable field's state.
+ */
+Blockly.FieldVariableGetter.prototype.fromXml = function(fieldElement) {
+  var id = fieldElement.getAttribute('id');
+  var variableName = fieldElement.textContent;
+  // 'variabletype' should be lowercase, but until July 2019 it was sometimes
+  // recorded as 'variableType'.  Thus we need to check for both.
+  var variableType = fieldElement.getAttribute('variabletype') ||
+      fieldElement.getAttribute('variableType') || '';
+
+  // pxt-blockly: variable ID and variable name are both unique, only use name
+  var variable = Blockly.Variables.getOrCreateVariablePackage(
+      this.sourceBlock_.workspace, null, variableName, variableType);
+
+  // This should never happen :)
+  if (variableType != null && variableType !== variable.type) {
+    throw Error('Serialized variable type with id \'' +
+      variable.getId() + '\' had type ' + variable.type + ', and ' +
+      'does not match variable field that references it: ' +
+      Blockly.Xml.domToText(fieldElement) + '.');
+  }
+
+  this.setValue(variable.getId());
+};
+
+/**
+ * Serialize this field to XML.
+ * @param {!Element} fieldElement The element to populate with info about the
+ *    field's state.
+ * @return {!Element} The element containing info about the field's state.
+ */
+Blockly.FieldVariableGetter.prototype.toXml = function(fieldElement) {
+  // Make sure the variable is initialized.
+  this.initModel();
+
+  fieldElement.id = this.variable_.getId();
+  fieldElement.textContent = this.variable_.name;
+  if (this.variable_.type) {
+    fieldElement.setAttribute('variabletype', this.variable_.type);
+  }
+  return fieldElement;
 };
 
 /**
@@ -173,28 +297,45 @@ Blockly.FieldVariableGetter.prototype.getVariable = function() {
   return this.variable_;
 };
 
-Blockly.FieldVariableGetter.prototype.setValue = function(id) {
-  var workspace = this.sourceBlock_.workspace;
-  var variable = Blockly.Variables.getVariable(workspace, id);
+/**
+ * Update the value of this variable field, as well as its variable and text.
+ *
+ * The variable ID should be valid at this point, but if a variable field
+ * validator returns a bad ID, this could break.
+ * @param {*} newId The value to be saved.
+ * @protected
+ */
+Blockly.FieldVariableGetter.prototype.doValueUpdate_ = function(newId) {
+  this.variable_ = Blockly.Variables.getVariable(
+      this.sourceBlock_.workspace, /** @type {string} */ (newId));
+  Blockly.FieldVariableGetter.superClass_.doValueUpdate_.call(this, newId);
+};
 
-  if (!variable) {
-    throw new Error('Variable id doesn\'t point to a real variable!  ID was ' +
-        id);
+/**
+ * Ensure that the id belongs to a valid variable of an allowed type.
+ * @param {*=} opt_newValue The id of the new variable to set.
+ * @return {?string} The validated id, or null if invalid.
+ * @protected
+ */
+Blockly.FieldVariableGetter.prototype.doClassValidation_ = function(opt_newValue) {
+  if (opt_newValue === null) {
+    return null;
   }
-  // Type checks!
+  var newId = /** @type {string} */ (opt_newValue);
+  var variable = Blockly.Variables.getVariable(
+      this.sourceBlock_.workspace, newId);
+  if (!variable) {
+    console.warn('Variable id doesn\'t point to a real variable! ' +
+        'ID was ' + newId);
+    return null;
+  }
+  // Type Checks.
   var type = variable.type;
   if (!this.typeIsAllowed_(type)) {
-    throw new Error('Variable type doesn\'t match this field!  Type was ' +
-        type);
+    console.warn('Variable type doesn\'t match this field!  Type was ' + type);
+    return null;
   }
-  if (this.sourceBlock_ && Blockly.Events.isEnabled()) {
-    var oldValue = this.variable_ ? this.variable_.getId() : null;
-    Blockly.Events.fire(new Blockly.Events.BlockChange(
-        this.sourceBlock_, 'field', this.name, oldValue, id));
-  }
-  this.variable_ = variable;
-  this.value_ = id;
-  this.setText(variable.name);
+  return newId;
 };
 
 /**
@@ -296,7 +437,19 @@ Blockly.FieldVariableGetter.prototype.showEditor_ = function() {
  * Suppress default editable behaviour.
  */
 Blockly.FieldVariableGetter.prototype.updateEditable = function() {
-  // nop.
+  if (!this.sourceBlock_.isInFlyout && this.sourceBlock_.isEditable()) {
+    this.sourceBlock_.pathObject.svgPath.style.cursor = this.CURSOR;
+  }
 };
 
-Blockly.Field.register('field_variable_getter', Blockly.FieldVariableGetter);
+/**
+ * Overrides referencesVariables(), indicating this field refers to a variable.
+ * @return {boolean} True.
+ * @package
+ * @override
+ */
+Blockly.FieldVariableGetter.prototype.referencesVariables = function() {
+  return true;
+};
+
+Blockly.fieldRegistry.register('field_variable_getter', Blockly.FieldVariableGetter);

@@ -1,9 +1,6 @@
 /**
  * @license
- * Visual Blocks Editor
- *
- * Copyright 2017 Google Inc.
- * https://developers.google.com/blockly/
+ * Copyright 2017 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,24 +21,11 @@
  */
 'use strict';
 
-goog.require('goog.testing');
-goog.require('goog.testing.MockControl');
-
 var mockControl_;
 var workspace;
-var savedFireFunc = Blockly.Events.fire;
-
-function temporary_fireEvent(event) {
-  if (!Blockly.Events.isEnabled()) {
-    return;
-  }
-  Blockly.Events.FIRE_QUEUE_.push(event);
-  Blockly.Events.fireNow_();
-}
 
 function eventTest_setUp() {
   workspace = new Blockly.Workspace();
-  mockControl_ = new goog.testing.MockControl();
 }
 
 function eventTest_setUpWithMockBlocks() {
@@ -67,7 +51,9 @@ function eventTest_setUpWithMockBlocks() {
 function eventTest_tearDown() {
   delete Blockly.Blocks['field_variable_test_block'];
   delete Blockly.Blocks['simple_test_block'];
-  mockControl_.$tearDown();
+  if (mockControl_) {
+    mockControl_.restore();
+  }
   workspace.dispose();
 }
 
@@ -78,7 +64,7 @@ function eventTest_tearDownWithMockBlocks() {
 
 function test_block_base_constructor() {
   eventTest_setUpWithMockBlocks();
-  setUpMockMethod(mockControl_, Blockly.utils, 'genUid', null, '1');
+  mockControl_ = setUpMockMethod(Blockly.utils, 'genUid', null, '1');
   try {
     var block = createSimpleTestBlock(workspace);
 
@@ -94,7 +80,7 @@ function test_block_base_constructor() {
 
 function test_var_base_constructor() {
   eventTest_setUpWithMockBlocks();
-  setUpMockMethod(mockControl_, Blockly.utils, 'genUid', null, '1');
+  mockControl_ = setUpMockMethod(Blockly.utils, 'genUid', null, '1');
   try {
     var variable = workspace.createVariable('name1', 'type1', 'id1');
 
@@ -158,7 +144,7 @@ function createSimpleTestBlock(workspace) {
 
 function test_create_constructor() {
   eventTest_setUpWithMockBlocks();
-  setUpMockMethod(mockControl_, Blockly.utils, 'genUid', null, ['1']);
+  mockControl_ = setUpMockMethod(Blockly.utils, 'genUid', null, ['1']);
   try {
     var block = createSimpleTestBlock(workspace);
 
@@ -172,7 +158,7 @@ function test_create_constructor() {
 function test_blockCreate_constructor() {
   // expect that blockCreate behaves the same as create.
   eventTest_setUpWithMockBlocks();
-  setUpMockMethod(mockControl_, Blockly.utils, 'genUid', null, ['1']);
+  mockControl_ = setUpMockMethod(Blockly.utils, 'genUid', null, ['1']);
   try {
     var block = createSimpleTestBlock(workspace);
 
@@ -185,7 +171,7 @@ function test_blockCreate_constructor() {
 
 function test_delete_constructor() {
   eventTest_setUpWithMockBlocks();
-  setUpMockMethod(mockControl_, Blockly.utils, 'genUid', null, ['1']);
+  mockControl_ = setUpMockMethod(Blockly.utils, 'genUid', null, ['1']);
   try {
     var block = createSimpleTestBlock(workspace);
     var event = new Blockly.Events.Delete(block);
@@ -197,9 +183,10 @@ function test_delete_constructor() {
 
 function test_blockDelete_constructor() {
   eventTest_setUpWithMockBlocks();
-  setUpMockMethod(mockControl_, Blockly.utils, 'genUid', null, ['1']);
+  mockControl_ = setUpMockMethod(Blockly.utils, 'genUid', null, ['1']);
   try {
     var block = createSimpleTestBlock(workspace);
+    block.setCommentText('test comment');
     var event = new Blockly.Events.BlockDelete(block);
     checkDeleteEventValues(event, block, ['1'], 'delete');
   } finally {
@@ -209,7 +196,7 @@ function test_blockDelete_constructor() {
 
 function test_change_constructor() {
   eventTest_setUpWithMockBlocks();
-  setUpMockMethod(mockControl_, Blockly.utils, 'genUid', null, ['1']);
+  mockControl_ = setUpMockMethod(Blockly.utils, 'genUid', null, ['1']);
   try {
     Blockly.Events.disable();
     var block = new Blockly.Block(workspace, 'field_variable_test_block');
@@ -225,7 +212,7 @@ function test_change_constructor() {
 
 function test_blockChange_constructor() {
   eventTest_setUpWithMockBlocks();
-  setUpMockMethod(mockControl_, Blockly.utils, 'genUid', null, ['1']);
+  mockControl_ = setUpMockMethod(Blockly.utils, 'genUid', null, ['1']);
   try {
     Blockly.Events.disable();
     var block = new Blockly.Block(workspace, 'field_variable_test_block');
@@ -243,10 +230,10 @@ function test_blockChange_constructor() {
 function test_move_constructorCoordinate() {
   // Expect the oldCoordinate to be set.
   eventTest_setUpWithMockBlocks();
-  setUpMockMethod(mockControl_, Blockly.utils, 'genUid', null, ['1', '2']);
+  mockControl_ = setUpMockMethod(Blockly.utils, 'genUid', null, ['1', '2']);
   try {
     var block1 = createSimpleTestBlock(workspace);
-    var coordinate = new goog.math.Coordinate(3,4);
+    var coordinate = new Blockly.utils.Coordinate(3, 4);
     block1.xy_ = coordinate;
 
     var event = new Blockly.Events.Move(block1);
@@ -260,12 +247,12 @@ function test_move_constructorCoordinate() {
 function test_move_constructoroldParentId() {
   // Expect the oldParentId to be set but not the oldCoordinate to be set.
   eventTest_setUpWithMockBlocks();
-  setUpMockMethod(mockControl_, Blockly.utils, 'genUid', null, ['1', '2']);
+  mockControl_ = setUpMockMethod(Blockly.utils, 'genUid', null, ['1', '2']);
   try {
     var block1 = createSimpleTestBlock(workspace);
     var block2 = createSimpleTestBlock(workspace);
     block1.parentBlock_ = block2;
-    block1.xy_ = new goog.math.Coordinate(3,4);
+    block1.xy_ = new Blockly.utils.Coordinate(3, 4);
 
     var event = new Blockly.Events.Move(block1);
     checkExactEventValues(event, {'oldCoordinate': undefined,
@@ -279,10 +266,10 @@ function test_move_constructoroldParentId() {
 function test_blockMove_constructorCoordinate() {
   // Expect the oldCoordinate to be set.
   eventTest_setUpWithMockBlocks();
-  setUpMockMethod(mockControl_, Blockly.utils, 'genUid', null, ['1', '2']);
+  mockControl_ = setUpMockMethod(Blockly.utils, 'genUid', null, ['1', '2']);
   try {
     var block1 = createSimpleTestBlock(workspace);
-    var coordinate = new goog.math.Coordinate(3,4);
+    var coordinate = new Blockly.utils.Coordinate(3, 4);
     block1.xy_ = coordinate;
 
     var event = new Blockly.Events.BlockMove(block1);
@@ -296,18 +283,64 @@ function test_blockMove_constructorCoordinate() {
 function test_blockMove_constructoroldParentId() {
   // Expect the oldParentId to be set but not the oldCoordinate to be set.
   eventTest_setUpWithMockBlocks();
-  setUpMockMethod(mockControl_, Blockly.utils, 'genUid', null, ['1', '2']);
+  mockControl_ = setUpMockMethod(Blockly.utils, 'genUid', null, ['1', '2']);
   try {
     var block1 = createSimpleTestBlock(workspace);
     var block2 = createSimpleTestBlock(workspace);
     block1.parentBlock_ = block2;
-    block1.xy_ = new goog.math.Coordinate(3,4);
+    block1.xy_ = new Blockly.utils.Coordinate(3, 4);
 
     var event = new Blockly.Events.BlockMove(block1);
     checkExactEventValues(event, {'oldCoordinate': undefined,
       'oldParentId': '2', 'type': 'move'});
     block1.parentBlock_ = null;
   } finally {
+    eventTest_tearDownWithMockBlocks();
+  }
+}
+
+function test_uiEvent_constructor_null() {
+  try {
+    Blockly.Events.setGroup('testGroup');
+    var event = new Blockly.Events.Ui(null, 'foo', 'bar', 'baz');
+    checkExactEventValues(event,
+        {
+          'blockId': null,
+          'workspaceId': null,
+          'type': 'ui',
+          'oldValue': 'bar',
+          'newValue': 'baz',
+          'element': 'foo',
+          'recordUndo': false,
+          'group': 'testGroup'
+        }
+    );
+  } finally {
+    Blockly.Events.setGroup(false);
+  }
+}
+
+function test_uiEvent_constructor_block() {
+  eventTest_setUpWithMockBlocks();
+  mockControl_ = setUpMockMethod(Blockly.utils, 'genUid', null, ['1']);
+  try {
+    var block1 = createSimpleTestBlock(workspace);
+    Blockly.Events.setGroup('testGroup');
+    var event = new Blockly.Events.Ui(block1, 'foo', 'bar', 'baz');
+    checkExactEventValues(event,
+        {
+          'blockId': '1',
+          'workspaceId': workspace.id,
+          'type': 'ui',
+          'oldValue': 'bar',
+          'newValue': 'baz',
+          'element': 'foo',
+          'recordUndo': false,
+          'group': 'testGroup'
+        }
+    );
+  } finally {
+    Blockly.Events.setGroup(false);
     eventTest_tearDownWithMockBlocks();
   }
 }
@@ -663,7 +696,7 @@ function test_events_filteraftermerge() {
  */
 function helper_addMoveEvent(events, block, newX, newY) {
   events.push(new Blockly.Events.BlockMove(block));
-  block.xy_ = new goog.math.Coordinate(newX, newY);
+  block.xy_ = new Blockly.utils.Coordinate(newX, newY);
   events[events.length-1].recordNew();
 }
 
@@ -680,7 +713,7 @@ function test_events_newblock_newvar() {
   temporary_fireEvent.firedEvents_ = [];
   // Expect three calls to genUid: one to set the block's ID, one for the event
   // group's id, and one for the variable's ID.
-  setUpMockMethod(mockControl_, Blockly.utils, 'genUid', null, ['1', '2', '3']);
+  mockControl_ = setUpMockMethod(Blockly.utils, 'genUid', null, ['1', '2', '3']);
   try {
     var block = workspace.newBlock('field_variable_test_block');
 
@@ -710,6 +743,7 @@ function test_events_newblock_newvar() {
 
 // The sequence of events should be the same whether the block was created from
 // XML or directly.
+// pxt-blockly: PXT Blockly references variables by name and not ID
 function test_events_newblock_newvar_xml() {
   eventTest_setUpWithMockBlocks();
 
@@ -717,9 +751,9 @@ function test_events_newblock_newvar_xml() {
   temporary_fireEvent.firedEvents_ = [];
   try {
         var dom = Blockly.Xml.textToDom(
-        '<xml>' +
+        '<xml xmlns="https://developers.google.com/blockly/xml">' +
         '  <block type="field_variable_test_block" id="block1">' +
-        '    <field name="VAR" id="id1" variabletype="">name1</field>' +
+        '    <field name="VAR" id="id1">name1</field>' +
         '  </block>' +
         '</xml>');
     Blockly.Xml.domToWorkspace(dom, workspace);
@@ -737,10 +771,40 @@ function test_events_newblock_newvar_xml() {
     assertEquals(event0.group, event1.group);
 
     // Expect the workspace to have a variable with ID 'id1'.
-    assertNotNull(workspace.getVariableById('id1'));
-    assertEquals('id1', event0.varId);
+    assertNotNull(workspace.getVariable('name1'));
+    assertEquals('name1', event0.varName);
   } finally {
     eventTest_tearDownWithMockBlocks();
     Blockly.Events.fire = savedFireFunc;
+  }
+}
+
+function test_events_filter_nomerge_move() {
+  // Move events should only merge if they refer to the same block and are
+  // consecutive.
+  // See github.com/google/blockly/pull/1892 for a worked example showing
+  // how merging non-consecutive events can fail when replacing a shadow
+  // block.
+  eventTest_setUpWithMockBlocks();
+  try {
+    var block1 = createSimpleTestBlock(workspace);
+    var block2 = createSimpleTestBlock(workspace);
+
+    var events = [];
+    helper_addMoveEvent(events, block1, 1, 1);
+    helper_addMoveEvent(events, block2, 1, 1);
+    events.push(new Blockly.Events.BlockDelete(block2));
+    helper_addMoveEvent(events, block1, 2, 2);
+
+    var filteredEvents = Blockly.Events.filter(events, true);
+    // Nothing should have merged.
+    assertEquals(4, filteredEvents.length);
+    // test that the order hasn't changed
+    assertTrue(filteredEvents[0] instanceof Blockly.Events.BlockMove);
+    assertTrue(filteredEvents[1] instanceof Blockly.Events.BlockMove);
+    assertTrue(filteredEvents[2] instanceof Blockly.Events.BlockDelete);
+    assertTrue(filteredEvents[3] instanceof Blockly.Events.BlockMove);
+  } finally {
+    eventTest_tearDownWithMockBlocks();
   }
 }
